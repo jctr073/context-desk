@@ -109,14 +109,15 @@ final class AppState: ObservableObject {
         let snapshotModel = model
         let snapshotOp = WritingOp.allCases.first { snapshotOps.contains($0) } ?? .cleanup
 
-        if snapshotModel.provider == .openai {
+        if AIWritingService.supports(snapshotModel.provider) {
+            let provider = snapshotModel.provider
             configuredProviders = Self.configuredProviderSet()
 
-            guard let apiKey = APIKeyStore.read(for: .openai) else {
-                startAddingKey(.openai)
+            guard let apiKey = APIKeyStore.read(for: provider) else {
+                startAddingKey(provider)
                 return
             }
-            runOpenAIImprove(
+            runAIImprove(
                 input: snapshotInput,
                 context: snapshotContext,
                 customInstructions: snapshotInstructions,
@@ -155,7 +156,7 @@ final class AppState: ObservableObject {
         Set(AIProvider.allCases.filter { APIKeyStore.exists(for: $0) })
     }
 
-    private func runOpenAIImprove(
+    private func runAIImprove(
         input: String,
         context: String,
         customInstructions: String,
@@ -168,7 +169,7 @@ final class AppState: ObservableObject {
         output = nil
         runTask = Task { [weak self] in
             do {
-                let blocks = try await OpenAIService.improve(
+                let blocks = try await AIWritingService.improve(
                     input: input,
                     context: context,
                     customInstructions: customInstructions,
@@ -190,7 +191,7 @@ final class AppState: ObservableObject {
             } catch {
                 guard !Task.isCancelled, let self else { return }
                 await MainActor.run {
-                    self.output = [.paragraph(text: "OpenAI request failed. Please check your API key and try again.")]
+                    self.output = [.paragraph(text: "\(model.provider.keyLabel) request failed. Please check your API key and try again.")]
                     self.running = false
                 }
             }

@@ -23,7 +23,7 @@ enum OutputFormat: String, CaseIterable, Identifiable, Hashable, Codable {
         }
     }
 
-    var openAIGuidance: String {
+    var guidance: String {
         switch self {
         case .paragraphs:
             return "Paragraphs: include one or more polished paragraphs for the revised text."
@@ -34,11 +34,11 @@ enum OutputFormat: String, CaseIterable, Identifiable, Hashable, Codable {
         }
     }
 
-    static func openAIGuidance(for formats: Set<OutputFormat>) -> String {
+    static func guidance(for formats: Set<OutputFormat>) -> String {
         let selected = requestedFormats(in: formats)
         let names = selected.map(\.label).joined(separator: ", ")
         let guidance = selected
-            .map(\.openAIGuidance)
+            .map(\.guidance)
             .map { "- \($0)" }
             .joined(separator: "\n")
 

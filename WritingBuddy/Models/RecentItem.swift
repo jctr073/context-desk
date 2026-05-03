@@ -4,6 +4,9 @@ struct RecentItem: Identifiable, Hashable, Codable {
     let id: String
     let createdAt: Date
     let input: String
+    let context: String
+    let inputImages: [AttachedImage]
+    let contextImages: [AttachedImage]
     let output: [OutputBlock]
     let operation: WritingOp
     let formats: Set<OutputFormat>
@@ -13,6 +16,9 @@ struct RecentItem: Identifiable, Hashable, Codable {
         id: String = UUID().uuidString,
         createdAt: Date = Date(),
         input: String,
+        context: String = "",
+        inputImages: [AttachedImage] = [],
+        contextImages: [AttachedImage] = [],
         output: [OutputBlock],
         operation: WritingOp,
         formats: Set<OutputFormat>,
@@ -21,10 +27,33 @@ struct RecentItem: Identifiable, Hashable, Codable {
         self.id = id
         self.createdAt = createdAt
         self.input = input
+        self.context = context
+        self.inputImages = inputImages
+        self.contextImages = contextImages
         self.output = output
         self.operation = operation
         self.formats = formats.isEmpty ? [.paragraphs] : formats
         self.modelID = modelID
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.createdAt = try c.decode(Date.self, forKey: .createdAt)
+        self.input = try c.decode(String.self, forKey: .input)
+        self.context = (try? c.decode(String.self, forKey: .context)) ?? ""
+        self.inputImages = (try? c.decode([AttachedImage].self, forKey: .inputImages)) ?? []
+        self.contextImages = (try? c.decode([AttachedImage].self, forKey: .contextImages)) ?? []
+        self.output = try c.decode([OutputBlock].self, forKey: .output)
+        self.operation = try c.decode(WritingOp.self, forKey: .operation)
+        let fmts = try c.decode(Set<OutputFormat>.self, forKey: .formats)
+        self.formats = fmts.isEmpty ? [.paragraphs] : fmts
+        self.modelID = try c.decode(String.self, forKey: .modelID)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, createdAt, input, context, inputImages, contextImages
+        case output, operation, formats, modelID
     }
 
     var title: String {

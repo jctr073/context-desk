@@ -7,25 +7,29 @@ struct HistorySidebar: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    if state.history.isEmpty {
-                        emptyState
-                    }
+            if state.historyVisible {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        if state.history.isEmpty {
+                            emptyState
+                        }
 
-                    ForEach(state.history) { item in
-                        RecentRow(item: item,
-                                  isSelected: state.activeRecentID == item.id,
-                                  palette: palette,
-                                  onTap: { state.selectHistoryItem(item) })
+                        ForEach(state.history) { item in
+                            RecentRow(item: item,
+                                      isSelected: state.activeRecentID == item.id,
+                                      palette: palette,
+                                      onTap: { state.selectHistoryItem(item) })
+                        }
                     }
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
+                footer
+            } else {
+                Spacer(minLength: 0)
             }
-            footer
         }
-        .frame(width: 220)
+        .frame(width: state.historyVisible ? 220 : 38)
         .frame(maxHeight: .infinity)
         .background(palette.sidebar)
         .overlay(alignment: .trailing) {
@@ -34,27 +38,42 @@ struct HistorySidebar: View {
     }
 
     private var header: some View {
-        HStack {
-            Text("HISTORY")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.6)
-                .foregroundColor(palette.muted)
-            Spacer()
-            Button(action: { state.newSession() }) {
-                Image(systemName: "plus")
-                    .font(.system(size: 10, weight: .medium))
+        HStack(spacing: 6) {
+            Button(action: { state.toggleHistoryVisible() }) {
+                Image(systemName: "sidebar.left")
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(palette.muted)
                     .frame(width: 22, height: 22)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .stroke(palette.border, lineWidth: 1)
-                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
             .buttonStyle(.plain)
-            .help("New (\u{2318}N)")
-            .keyboardShortcut("n", modifiers: .command)
+            .help(state.historyVisible
+                  ? "Hide history (\u{2318}\u{2325}S)"
+                  : "Show history (\u{2318}\u{2325}S)")
+            .keyboardShortcut("s", modifiers: [.command, .option])
+
+            if state.historyVisible {
+                Text("HISTORY")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundColor(palette.muted)
+                Spacer()
+                Button(action: { state.newSession() }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(palette.muted)
+                        .frame(width: 22, height: 22)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .stroke(palette.border, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("New (\u{2318}N)")
+                .keyboardShortcut("n", modifiers: .command)
+            }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
         .padding(.top, 10)
         .padding(.bottom, 8)
     }

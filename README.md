@@ -14,7 +14,8 @@ output for now.
 
 - macOS-style window with custom titlebar, traffic lights, and a model
   picker tucked in the top-right.
-- OpenAI GPT-5.5 and Anthropic Claude model picker options.
+- OpenAI GPT-5.5 and Anthropic Claude model picker options, including Opus
+  4.7 effort levels.
 - Multi-select operation chips with keyboard shortcuts (⌘1 – ⌘4).
 - Multi-select output format chips (Paragraphs, Bullets, Tables).
 - System-wide Control-A import: copies selected text from any app into the
@@ -96,6 +97,7 @@ custom instructions, selected operation, selected output formats, and model.
 `AIWritingService` then maps that request to the selected provider's API:
 OpenAI receives `instructions` + `input` through the Responses API, while
 Anthropic receives the same instructions as the Messages API `system` value
-and the input as the user message. Provider key lookup checks the provider's
-environment variable names in `~/.zshrc` first, then falls back to the
-Keychain-saved key.
+and the input as the user message. Claude Opus 4.7 effort variants are sent
+as Anthropic `output_config.effort` with adaptive thinking enabled. Provider
+key lookup checks the provider's environment variable names in `~/.zshrc`
+first, then falls back to the Keychain-saved key.

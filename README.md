@@ -4,16 +4,17 @@ A macOS writing assistant. Paste in text, pick the transformations you want
 (Rephrase / Expand / Shorten / Clean up) and the output formats you'd like
 (Paragraphs / Bullets / Tables), then hit **Improve**.
 
-Built in **SwiftUI** for macOS 13+. GPT-5.5 uses the OpenAI Responses API
-with selectable reasoning effort levels, reads `OPENAI_API_KEY` from
-`~/.zshrc` before falling back to Mac Keychain, and defaults to GPT-5.5
-Medium; other providers still use deterministic mock output for now.
+Built in **SwiftUI** for macOS 13+. OpenAI models use the Responses API,
+Claude models use Anthropic's Messages API, API keys are read from
+`~/.zshrc` before falling back to Mac Keychain, and the app defaults to
+GPT-5.5 Medium. Providers without a live client still use deterministic mock
+output for now.
 
 ## Features
 
 - macOS-style window with custom titlebar, traffic lights, and a model
   picker tucked in the top-right.
-- GPT-5.5 Low / Medium / High / xhigh model picker options.
+- OpenAI GPT-5.5 and Anthropic Claude model picker options.
 - Multi-select operation chips with keyboard shortcuts (⌘1 – ⌘4).
 - Multi-select output format chips (Paragraphs, Bullets, Tables).
 - System-wide Control-A import: copies selected text from any app into the
@@ -64,7 +65,7 @@ WritingBuddy/
     OutputBlock.swift       — paragraph | heading | bulletList | table
     RecentItem.swift        — persisted history items
     AIModel.swift           — model list
-    OpenAIService.swift     — OpenAI Responses API client
+    OpenAIService.swift     — provider-dispatched AI writing clients
     GlobalSelectionShortcut.swift — system-wide selected-text import
     MockGenerator.swift     — deterministic fallback generator
     DiffEngine.swift        — LCS-based word diff
@@ -89,9 +90,12 @@ WritingBuddy/
 
 ## Model routing
 
-GPT-5.5 calls `OpenAIService.improve(input:operation:formats:model:apiKey:)`
-with `model: "gpt-5.5"` and the selected `reasoning.effort`, then returns
-parsed `[OutputBlock]` values. OpenAI key lookup checks `OPENAI_API_KEY` in
-`~/.zshrc` first, then falls back to the Keychain-saved OpenAI key. Other
-model selections still use `MockGenerator.generate(input:ops:fmts:model:)`
-until their providers are wired up.
+Live models call `AIWritingService.improve(input:context:customInstructions:operation:formats:model:apiKey:)`.
+The UI passes one provider-neutral request: input text, reference context,
+custom instructions, selected operation, selected output formats, and model.
+`AIWritingService` then maps that request to the selected provider's API:
+OpenAI receives `instructions` + `input` through the Responses API, while
+Anthropic receives the same instructions as the Messages API `system` value
+and the input as the user message. Provider key lookup checks the provider's
+environment variable names in `~/.zshrc` first, then falls back to the
+Keychain-saved key.

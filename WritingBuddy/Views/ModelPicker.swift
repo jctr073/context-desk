@@ -58,7 +58,7 @@ private struct ModelPickerMenu: View {
 
             Divider()
 
-            Text("OpenAI checks OPENAI_API_KEY in ~/.zshrc first, then Mac Keychain.")
+            Text("API keys are checked in ~/.zshrc first, then Mac Keychain.")
                 .font(.system(size: 11))
                 .foregroundColor(palette.muted)
                 .padding(.horizontal, 14)

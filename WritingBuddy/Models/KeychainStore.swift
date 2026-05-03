@@ -72,7 +72,7 @@ enum KeychainStore {
 
 enum APIKeyStore {
     static func read(for provider: AIProvider) -> String? {
-        if provider == .openai, let key = ShellProfileAPIKeyStore.readOpenAIKey() {
+        if let key = ShellProfileAPIKeyStore.readKey(for: provider) {
             return key
         }
 
@@ -85,19 +85,23 @@ enum APIKeyStore {
 }
 
 private enum ShellProfileAPIKeyStore {
-    private static let openAIKeyName = "OPENAI_API_KEY"
-
     private static var zshrcURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".zshrc")
     }
 
-    static func readOpenAIKey() -> String? {
+    static func readKey(for provider: AIProvider) -> String? {
         guard let contents = try? String(contentsOf: zshrcURL, encoding: .utf8) else {
             return nil
         }
 
-        return shellAssignment(named: openAIKeyName, in: contents)
+        for keyName in provider.shellAPIKeyNames {
+            if let key = shellAssignment(named: keyName, in: contents) {
+                return key
+            }
+        }
+
+        return nil
     }
 
     private static func shellAssignment(named variable: String, in contents: String) -> String? {

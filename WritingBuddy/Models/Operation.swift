@@ -37,7 +37,7 @@ enum WritingOp: String, CaseIterable, Identifiable, Hashable, Codable {
 
     var kbdHint: String { "\u{2318}\(keyEquivalent)" }
 
-    var openAIInstructions: String {
+    var instructions: String {
         switch self {
         case .rephrase:
             return """

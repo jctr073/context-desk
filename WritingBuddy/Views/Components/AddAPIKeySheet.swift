@@ -15,11 +15,7 @@ struct AddAPIKeySheet: View {
     }
 
     private var helpText: String {
-        if provider == .openai {
-            return "WritingBuddy uses OPENAI_API_KEY from ~/.zshrc first. Saving here stores a fallback in Mac Keychain and only sends it to \(provider.apiHost)."
-        }
-
-        return "Paste your \(provider.keyLabel) API key. WritingBuddy stores it in your Mac Keychain and only sends it to \(provider.apiHost)."
+        "WritingBuddy checks \(provider.shellAPIKeyLabel) in ~/.zshrc first. Saving here stores a fallback in Mac Keychain and only sends it to \(provider.apiHost)."
     }
 
     var body: some View {

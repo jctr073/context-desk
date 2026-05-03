@@ -27,8 +27,8 @@ struct ContentView: View {
         .frame(minWidth: 760, minHeight: 540)
         .background(WindowAccessor())
         .onAppear {
-            GlobalSelectionShortcut.shared.start {
-                state.importSelectedTextFromActiveApp()
+            GlobalSelectionShortcut.shared.start { targetTab in
+                state.importSelectedTextFromActiveApp(to: targetTab)
             }
         }
         .onDisappear {

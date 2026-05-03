@@ -21,8 +21,8 @@ output for now.
 - Input and context image attachments via picker, paste, or drag and drop.
 - Attached images are previewed inline, can be opened in a lightbox, and are
   included in live OpenAI / Anthropic requests.
-- System-wide Control-A import: copies selected text from any app into the
-  input editor while WritingBuddy is running.
+- System-wide Control-A / Control-Q import: copies selected text from any app
+  into the input or context editor while WritingBuddy is running.
 - Collapsible history sidebar with saved text, context, images, and outputs.
 - Stacked or side-by-side layout (toggle via the floating Tweaks panel).
 - Light & dark themes (toggle via Tweaks).

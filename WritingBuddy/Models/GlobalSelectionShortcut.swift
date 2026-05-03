@@ -7,17 +7,42 @@ final class GlobalSelectionShortcut {
     static let shared = GlobalSelectionShortcut()
 
     private static let signature = OSType(0x5742484B) // WBHK
-    private static let importSelectionID = UInt32(1)
 
-    private var hotKeyRef: EventHotKeyRef?
+    private enum HotKey: UInt32, CaseIterable {
+        case importInput = 1
+        case importContext = 2
+
+        var keyCode: UInt32 {
+            switch self {
+            case .importInput: return UInt32(kVK_ANSI_A)
+            case .importContext: return UInt32(kVK_ANSI_Q)
+            }
+        }
+
+        var targetTab: InputTab {
+            switch self {
+            case .importInput: return .input
+            case .importContext: return .context
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .importInput: return "Control-A"
+            case .importContext: return "Control-Q"
+            }
+        }
+    }
+
+    private var hotKeyRefs: [EventHotKeyRef] = []
     private var eventHandlerRef: EventHandlerRef?
-    private var action: (() -> Void)?
+    private var action: ((InputTab) -> Void)?
 
     private init() {}
 
-    func start(action: @escaping () -> Void) {
+    func start(action: @escaping (InputTab) -> Void) {
         self.action = action
-        guard hotKeyRef == nil else { return }
+        guard hotKeyRefs.isEmpty else { return }
 
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
@@ -42,7 +67,7 @@ final class GlobalSelectionShortcut {
 
                 guard parameterStatus == noErr,
                       hotKeyID.signature == GlobalSelectionShortcut.signature,
-                      hotKeyID.id == GlobalSelectionShortcut.importSelectionID
+                      let hotKey = HotKey(rawValue: hotKeyID.id)
                 else {
                     return noErr
                 }
@@ -52,7 +77,7 @@ final class GlobalSelectionShortcut {
                     .takeUnretainedValue()
 
                 Task { @MainActor in
-                    shortcut.action?()
+                    shortcut.action?(hotKey.targetTab)
                 }
 
                 return noErr
@@ -68,31 +93,37 @@ final class GlobalSelectionShortcut {
             return
         }
 
-        let hotKeyID = EventHotKeyID(
-            signature: Self.signature,
-            id: Self.importSelectionID
-        )
+        for hotKey in HotKey.allCases {
+            var hotKeyRef: EventHotKeyRef?
+            let hotKeyID = EventHotKeyID(
+                signature: Self.signature,
+                id: hotKey.rawValue
+            )
 
-        let hotKeyStatus = RegisterEventHotKey(
-            UInt32(kVK_ANSI_A),
-            UInt32(controlKey),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
+            let hotKeyStatus = RegisterEventHotKey(
+                hotKey.keyCode,
+                UInt32(controlKey),
+                hotKeyID,
+                GetApplicationEventTarget(),
+                0,
+                &hotKeyRef
+            )
 
-        if hotKeyStatus != noErr {
-            print("Global Control-A shortcut registration failed:", hotKeyStatus)
-            stop()
+            guard hotKeyStatus == noErr, let hotKeyRef else {
+                print("Global \(hotKey.label) shortcut registration failed:", hotKeyStatus)
+                stop()
+                return
+            }
+
+            hotKeyRefs.append(hotKeyRef)
         }
     }
 
     func stop() {
-        if let hotKeyRef {
+        for hotKeyRef in hotKeyRefs {
             UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
         }
+        hotKeyRefs.removeAll()
 
         if let eventHandlerRef {
             RemoveEventHandler(eventHandlerRef)

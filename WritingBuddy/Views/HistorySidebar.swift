@@ -9,11 +9,15 @@ struct HistorySidebar: View {
             header
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    ForEach(Recents.all) { item in
+                    if state.history.isEmpty {
+                        emptyState
+                    }
+
+                    ForEach(state.history) { item in
                         RecentRow(item: item,
                                   isSelected: state.activeRecentID == item.id,
                                   palette: palette,
-                                  onTap: { state.activeRecentID = item.id })
+                                  onTap: { state.selectHistoryItem(item) })
                     }
                 }
                 .padding(.horizontal, 6)
@@ -59,7 +63,7 @@ struct HistorySidebar: View {
         HStack(spacing: 6) {
             Image(systemName: "clock.arrow.circlepath")
                 .font(.system(size: 11))
-            Text("\(Recents.all.count) recent")
+            Text("\(state.history.count) recent")
                 .font(.system(size: 11))
         }
         .foregroundColor(palette.muted)
@@ -69,6 +73,15 @@ struct HistorySidebar: View {
         .overlay(alignment: .top) {
             Rectangle().fill(palette.border).frame(height: 1)
         }
+    }
+
+    private var emptyState: some View {
+        Text("No history yet")
+            .font(.system(size: 11))
+            .foregroundColor(palette.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
     }
 }
 
@@ -96,8 +109,19 @@ private struct RecentRow: View {
                     Text(item.when)
                         .font(.system(size: 10.5))
                         .foregroundColor(palette.muted)
-                    ForEach(item.actions, id: \.self) { tag in
+                    ForEach(Array(item.actions.prefix(2)), id: \.self) { tag in
                         Text(tag)
+                            .font(.system(size: 10))
+                            .foregroundColor(palette.muted)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                    .stroke(palette.border, lineWidth: 1)
+                            )
+                    }
+                    if item.actions.count > 2 {
+                        Text("+\(item.actions.count - 2)")
                             .font(.system(size: 10))
                             .foregroundColor(palette.muted)
                             .padding(.horizontal, 6)

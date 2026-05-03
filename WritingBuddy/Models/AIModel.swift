@@ -70,4 +70,8 @@ struct AIModel: Identifiable, Hashable {
     static func models(for provider: AIProvider) -> [AIModel] {
         all.filter { $0.provider == provider }
     }
+
+    static func model(withID id: String) -> AIModel? {
+        all.first { $0.id == id }
+    }
 }

@@ -2,13 +2,14 @@ import SwiftUI
 
 @MainActor
 final class AppState: ObservableObject {
-    @Published var input: String = MockGenerator.sampleInput
+    @Published var input: String = ""
     @Published var ops: Set<WritingOp> = [.cleanup]
     @Published var fmts: Set<OutputFormat> = [.paragraphs]
     @Published var output: [OutputBlock]? = nil
     @Published var running: Bool = false
     @Published var diffMode: Bool = false
-    @Published var activeRecentID: String? = "r1"
+    @Published var activeRecentID: String? = nil
+    @Published var history: [RecentItem] = []
     @Published var model: AIModel = .gpt55
     @Published var theme: AppTheme = .light
     @Published var layout: PaneLayout = .stacked
@@ -20,15 +21,7 @@ final class AppState: ObservableObject {
 
     init() {
         self.configuredProviders = Set(AIProvider.allCases.filter { KeychainStore.exists(for: $0) })
-
-        // Initial output so the design looks alive on first paint
-        // (mirrors the React `useEffect` in the prototype).
-        self.output = MockGenerator.generate(
-            input: MockGenerator.sampleInput,
-            ops: [.cleanup],
-            fmts: [.paragraphs],
-            model: model
-        )
+        self.history = HistoryStore.load()
     }
 
     func hasKey(for provider: AIProvider) -> Bool {
@@ -73,7 +66,12 @@ final class AppState: ObservableObject {
     }
 
     func toggleFormat(_ fmt: OutputFormat) {
-        if fmts.contains(fmt) { fmts.remove(fmt) } else { fmts.insert(fmt) }
+        if fmts.contains(fmt) {
+            guard fmts.count > 1 else { return }
+            fmts.remove(fmt)
+        } else {
+            fmts.insert(fmt)
+        }
     }
 
     func run() {
@@ -83,14 +81,20 @@ final class AppState: ObservableObject {
         let snapshotOps = ops
         let snapshotFmts = fmts
         let snapshotModel = model
+        let snapshotOp = WritingOp.allCases.first { snapshotOps.contains($0) } ?? .cleanup
 
         if snapshotModel == .gpt55 {
             guard let apiKey = KeychainStore.read(for: .openai) else {
                 startAddingKey(.openai)
                 return
             }
-            let snapshotOp = WritingOp.allCases.first { snapshotOps.contains($0) } ?? .cleanup
-            runOpenAIImprove(input: snapshotInput, operation: snapshotOp, model: snapshotModel, apiKey: apiKey)
+            runOpenAIImprove(
+                input: snapshotInput,
+                operation: snapshotOp,
+                formats: snapshotFmts,
+                model: snapshotModel,
+                apiKey: apiKey
+            )
             return
         }
 
@@ -106,22 +110,44 @@ final class AppState: ObservableObject {
                 model: snapshotModel
             )
             await MainActor.run {
-                self.output = result
-                self.running = false
+                self.finishRun(
+                    input: snapshotInput,
+                    operation: snapshotOp,
+                    formats: snapshotFmts,
+                    model: snapshotModel,
+                    output: result
+                )
             }
         }
     }
 
-    private func runOpenAIImprove(input: String, operation: WritingOp, model: AIModel, apiKey: String) {
+    private func runOpenAIImprove(
+        input: String,
+        operation: WritingOp,
+        formats: Set<OutputFormat>,
+        model: AIModel,
+        apiKey: String
+    ) {
         running = true
         output = nil
         runTask = Task { [weak self] in
             do {
-                let text = try await OpenAIService.improve(input: input, operation: operation, model: model, apiKey: apiKey)
+                let blocks = try await OpenAIService.improve(
+                    input: input,
+                    operation: operation,
+                    formats: formats,
+                    model: model,
+                    apiKey: apiKey
+                )
                 guard !Task.isCancelled, let self else { return }
                 await MainActor.run {
-                    self.output = [.paragraph(text: text)]
-                    self.running = false
+                    self.finishRun(
+                        input: input,
+                        operation: operation,
+                        formats: formats,
+                        model: model,
+                        output: blocks
+                    )
                 }
             } catch {
                 guard !Task.isCancelled, let self else { return }
@@ -133,7 +159,61 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func finishRun(
+        input: String,
+        operation: WritingOp,
+        formats: Set<OutputFormat>,
+        model: AIModel,
+        output blocks: [OutputBlock]
+    ) {
+        output = blocks
+        running = false
+        addHistoryItem(
+            input: input,
+            output: blocks,
+            operation: operation,
+            formats: formats,
+            model: model
+        )
+    }
+
+    private func addHistoryItem(
+        input: String,
+        output: [OutputBlock],
+        operation: WritingOp,
+        formats: Set<OutputFormat>,
+        model: AIModel
+    ) {
+        let item = RecentItem(
+            input: input,
+            output: output,
+            operation: operation,
+            formats: formats,
+            modelID: model.id
+        )
+        history.removeAll { $0.id == item.id }
+        history.insert(item, at: 0)
+        history = Array(history.prefix(HistoryStore.maxItems))
+        HistoryStore.save(history)
+        activeRecentID = item.id
+    }
+
+    func selectHistoryItem(_ item: RecentItem) {
+        runTask?.cancel()
+        running = false
+        input = item.input
+        output = item.output
+        ops = [item.operation]
+        fmts = item.formats.isEmpty ? [.paragraphs] : item.formats
+        if let restoredModel = AIModel.model(withID: item.modelID) {
+            model = restoredModel
+        }
+        activeRecentID = item.id
+    }
+
     func newSession() {
+        runTask?.cancel()
+        running = false
         input = ""
         output = nil
         activeRecentID = nil

@@ -4,8 +4,9 @@ A macOS writing assistant. Paste in text, pick the transformations you want
 (Rephrase / Expand / Shorten / Clean up) and the output formats you'd like
 (Paragraphs / Bullets / Tables), then hit **Improve**.
 
-Built in **SwiftUI** for macOS 13+. The "AI" output is a deterministic mock
-(no API key required) — wire in a real model when you're ready.
+Built in **SwiftUI** for macOS 13+. GPT-5.5 uses the OpenAI Responses API
+with keys stored in Mac Keychain; other providers still use deterministic
+mock output for now.
 
 ## Features
 
@@ -15,7 +16,7 @@ Built in **SwiftUI** for macOS 13+. The "AI" output is a deterministic mock
 - Multi-select output format chips (Paragraphs, Bullets, Tables).
 - Stacked or side-by-side layout (toggle via the floating Tweaks panel).
 - Light & dark themes (toggle via Tweaks).
-- History sidebar with sample recents and a "+" to start a new session
+- History sidebar with saved runs and a "+" to start a new session
   (⌘N).
 - Diff view that highlights additions / deletions vs. the original input.
 - Streaming-style skeleton placeholder while a run is in progress.
@@ -28,9 +29,8 @@ Requires **Xcode 15+** and **macOS 13+**.
 open WritingBuddy.xcodeproj
 ```
 
-Press ⌘R in Xcode. The app launches with sample input pre-loaded and an
-initial mocked output already rendered, so you can see the design "alive"
-on first paint.
+Press ⌘R in Xcode. The app launches with an empty editor; completed runs
+are saved into the history sidebar.
 
 For a command-line release build:
 
@@ -58,9 +58,10 @@ WritingBuddy/
     Operation.swift         — Rephrase / Expand / Shorten / Clean up
     OutputFormat.swift      — Paragraphs / Bullets / Tables
     OutputBlock.swift       — paragraph | heading | bulletList | table
-    RecentItem.swift        — sample sidebar items
-    AIModel.swift           — mocked model list
-    MockGenerator.swift     — deterministic output generator
+    RecentItem.swift        — persisted history items
+    AIModel.swift           — model list
+    OpenAIService.swift     — OpenAI Responses API client
+    MockGenerator.swift     — deterministic fallback generator
     DiffEngine.swift        — LCS-based word diff
   Views/
     ContentView.swift       — top-level layout
@@ -81,9 +82,9 @@ WritingBuddy/
       TrafficLightsArea.swift — left-padding spacer for AppKit traffic lights
 ```
 
-## Wiring a real LLM
+## Model routing
 
-`MockGenerator.generate(input:ops:fmts:model:)` is the single seam. Replace
-its body with a call into the Anthropic SDK (or whatever provider you
-prefer) and return `[OutputBlock]`. The 650 ms `Task.sleep` in
-`AppState.run()` simulates network latency — drop or shorten it.
+GPT-5.5 calls `OpenAIService.improve(input:operation:formats:model:apiKey:)`
+and returns parsed `[OutputBlock]` values. Other model selections still use
+`MockGenerator.generate(input:ops:fmts:model:)` until their providers are
+wired up.

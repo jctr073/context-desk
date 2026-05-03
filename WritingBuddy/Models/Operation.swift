@@ -1,6 +1,6 @@
 import Foundation
 
-enum WritingOp: String, CaseIterable, Identifiable, Hashable {
+enum WritingOp: String, CaseIterable, Identifiable, Hashable, Codable {
     case rephrase
     case expand
     case shorten
@@ -41,19 +41,19 @@ enum WritingOp: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .rephrase:
             return """
-            Rephrase the user's writing. Preserve the original meaning and important details, improve wording and flow, keep roughly the same length, and return only the revised text as a single paragraph.
+            Rephrase the user's writing. Preserve the original meaning and important details, improve wording and flow, and keep roughly the same length.
             """
         case .expand:
             return """
-            Expand the user's writing. Preserve the original meaning, add useful context and connective detail without inventing facts, improve clarity and flow, and return only the revised text as a single paragraph.
+            Expand the user's writing. Preserve the original meaning, add useful context and connective detail without inventing facts, and improve clarity and flow.
             """
         case .shorten:
             return """
-            Shorten the user's writing. Preserve the core meaning and important details, remove redundancy, keep it concise and clear, and return only the revised text as a single paragraph.
+            Shorten the user's writing. Preserve the core meaning and important details, remove redundancy, and keep it concise and clear.
             """
         case .cleanup:
             return """
-            Clean up the user's writing. Preserve the original meaning, keep it concise, fix grammar and punctuation, improve clarity and flow, and return only the revised text as a single paragraph.
+            Clean up the user's writing. Preserve the original meaning, keep it concise, fix grammar and punctuation, and improve clarity and flow.
             """
         }
     }

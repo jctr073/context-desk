@@ -32,6 +32,19 @@ Press ⌘R in Xcode. The app launches with sample input pre-loaded and an
 initial mocked output already rendered, so you can see the design "alive"
 on first paint.
 
+For a command-line release build:
+
+```sh
+scripts/build-app.sh
+```
+
+The packaged app is written to `.build/app/WritingBuddy.app`. To build and
+copy it into `/Applications`:
+
+```sh
+scripts/install-system.sh
+```
+
 ## Project layout
 
 ```

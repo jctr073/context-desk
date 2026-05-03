@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# SwiftPM / Xcode build output
+.build/
+build/
+DerivedData/
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+
+# Local packaging artifacts
+*.dSYM/
+*.dSYM.zip

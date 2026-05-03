@@ -9,7 +9,7 @@ final class AppState: ObservableObject {
     @Published var running: Bool = false
     @Published var diffMode: Bool = false
     @Published var activeRecentID: String? = "r1"
-    @Published var model: AIModel = .claudeSonnet45
+    @Published var model: AIModel = .gpt55
     @Published var theme: AppTheme = .light
     @Published var layout: PaneLayout = .stacked
     @Published var copiedFlash: Bool = false
@@ -69,7 +69,7 @@ final class AppState: ObservableObject {
     }
 
     func toggleOp(_ op: WritingOp) {
-        if ops.contains(op) { ops.remove(op) } else { ops.insert(op) }
+        ops = [op]
     }
 
     func toggleFormat(_ fmt: OutputFormat) {
@@ -79,12 +79,23 @@ final class AppState: ObservableObject {
     func run() {
         guard canRun else { return }
         runTask?.cancel()
-        running = true
-        output = nil
         let snapshotInput = input
         let snapshotOps = ops
         let snapshotFmts = fmts
         let snapshotModel = model
+
+        if snapshotModel == .gpt55 {
+            guard let apiKey = KeychainStore.read(for: .openai) else {
+                startAddingKey(.openai)
+                return
+            }
+            let snapshotOp = WritingOp.allCases.first { snapshotOps.contains($0) } ?? .cleanup
+            runOpenAIImprove(input: snapshotInput, operation: snapshotOp, model: snapshotModel, apiKey: apiKey)
+            return
+        }
+
+        running = true
+        output = nil
         runTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 650_000_000) // 650ms — matches prototype
             guard !Task.isCancelled, let self else { return }
@@ -97,6 +108,27 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.output = result
                 self.running = false
+            }
+        }
+    }
+
+    private func runOpenAIImprove(input: String, operation: WritingOp, model: AIModel, apiKey: String) {
+        running = true
+        output = nil
+        runTask = Task { [weak self] in
+            do {
+                let text = try await OpenAIService.improve(input: input, operation: operation, model: model, apiKey: apiKey)
+                guard !Task.isCancelled, let self else { return }
+                await MainActor.run {
+                    self.output = [.paragraph(text: text)]
+                    self.running = false
+                }
+            } catch {
+                guard !Task.isCancelled, let self else { return }
+                await MainActor.run {
+                    self.output = [.paragraph(text: "OpenAI request failed. Please check your API key and try again.")]
+                    self.running = false
+                }
             }
         }
     }

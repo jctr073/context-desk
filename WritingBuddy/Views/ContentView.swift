@@ -21,6 +21,7 @@ struct ContentView: View {
                 .padding(.bottom, 16)
 
             apiKeyOverlay(palette: palette)
+            instructionsOverlay(palette: palette)
         }
         .frame(minWidth: 760, minHeight: 540)
         .background(WindowAccessor())
@@ -48,6 +49,22 @@ struct ContentView: View {
             }
         }
         .animation(.easeOut(duration: 0.12), value: state.addingKeyFor)
+    }
+
+    @ViewBuilder
+    private func instructionsOverlay(palette: Palette) -> some View {
+        ZStack {
+            if state.editingInstructions {
+                palette.modalScrim
+                    .ignoresSafeArea()
+                    .onTapGesture { state.cancelEditingInstructions() }
+                    .transition(.opacity)
+
+                CustomInstructionsSheet(state: state, palette: palette)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: state.editingInstructions)
     }
 
     @ViewBuilder

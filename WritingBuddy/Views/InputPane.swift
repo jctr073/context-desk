@@ -7,9 +7,15 @@ struct InputPane: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
-            ZStack(alignment: .bottom) {
-                editor
-                footer
+            ZStack(alignment: .topLeading) {
+                if state.inputTab == .context {
+                    contextHint
+                }
+                ZStack(alignment: .bottom) {
+                    editor
+                    footer
+                }
+                .padding(.top, state.inputTab == .context ? 36 : 0)
             }
         }
         .background(palette.panel)
@@ -18,9 +24,20 @@ struct InputPane: View {
     // MARK: - Toolbar
 
     private var toolbar: some View {
-        HStack(spacing: 6) {
-            SectionLabel(text: "Input", palette: palette)
+        HStack(spacing: 8) {
+            tabButton(.input)
+            tabButton(.context)
+
+            instructionsButton
+                .padding(.leading, 4)
+
+            Rectangle()
+                .fill(palette.border)
+                .frame(width: 1, height: 20)
+                .padding(.horizontal, 2)
+
             Spacer()
+
             ForEach(WritingOp.allCases) { op in
                 Chip(label: op.label,
                      systemImage: op.sfSymbol,
@@ -41,18 +58,84 @@ struct InputPane: View {
         }
     }
 
+    @ViewBuilder
+    private func tabButton(_ tab: InputTab) -> some View {
+        let isActive = state.inputTab == tab
+        Button {
+            if state.inputTab != tab {
+                state.inputTab = tab
+            }
+        } label: {
+            Text(tab.label.uppercased())
+                .font(.system(size: 11, weight: .heavy))
+                .tracking(0.7)
+                .foregroundColor(isActive ? palette.text : palette.muted)
+                .padding(.horizontal, 10)
+                .frame(height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isActive ? palette.surfaceInset : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(isActive ? palette.chipBorder : Color.clear, lineWidth: 1)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(tab == .context
+              ? "Add reference material that informs the rewrite"
+              : "The text to be rewritten")
+    }
+
+    @ViewBuilder
+    private var instructionsButton: some View {
+        let active = state.hasCustomInstructions
+        Button {
+            state.startEditingInstructions()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 11, weight: .medium))
+                Text("Instructions")
+                    .font(.system(size: 12, weight: .medium))
+                if active {
+                    Circle()
+                        .fill(palette.accent)
+                        .frame(width: 5, height: 5)
+                }
+            }
+            .foregroundColor(palette.text)
+            .padding(.horizontal, 11)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(palette.chip)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(active ? palette.accent.opacity(0.6) : palette.chipBorder,
+                            lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(active
+              ? "Custom direction applied to every run (click to edit)"
+              : "Add a custom direction for the rewrite")
+    }
+
     // MARK: - Editor
 
     private var editor: some View {
         ZStack(alignment: .topLeading) {
-            // TextEditor with transparent background
-            EditorView(text: $state.input, palette: palette)
+            EditorView(text: editorBinding, palette: palette)
                 .padding(.horizontal, 18)
                 .padding(.top, 14)
-                .padding(.bottom, 50) // leave space for footer
+                .padding(.bottom, 50)
 
-            if state.input.isEmpty {
-                Text("Paste or type what you want to improve\u{2026}")
+            if currentText.isEmpty {
+                Text(placeholder)
                     .font(.system(size: 14))
                     .foregroundColor(palette.muted)
                     .padding(.horizontal, 24)
@@ -61,6 +144,39 @@ struct InputPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var editorBinding: Binding<String> {
+        switch state.inputTab {
+        case .input:   return $state.input
+        case .context: return $state.context
+        }
+    }
+
+    private var currentText: String {
+        state.inputTab == .input ? state.input : state.context
+    }
+
+    private var placeholder: String {
+        switch state.inputTab {
+        case .input:
+            return "Paste or type what you want to improve\u{2026}"
+        case .context:
+            return "e.g. \"Audience: technical execs at our top 25 enterprise customers. Voice: direct, no marketing fluff. Reference our Q3 launch which slipped 2 weeks due to billing migration\u{2026}\""
+        }
+    }
+
+    private var contextHint: some View {
+        Text("Reference material to inform the rewrite \u{2014} not text to be rewritten. Paste briefs, style guides, prior emails, transcripts, or audience notes.")
+            .font(.system(size: 11))
+            .foregroundColor(palette.muted)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(palette.surfaceInset)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(palette.border).frame(height: 1)
+            }
     }
 
     // MARK: - Footer
@@ -163,6 +279,7 @@ private struct EditorView: NSViewRepresentable {
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
+        context.coordinator.parent = self
         let tv = scroll.documentView as! NSTextView
         if tv.string != text {
             tv.string = text
@@ -178,7 +295,7 @@ private struct EditorView: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
-        let parent: EditorView
+        var parent: EditorView
         init(_ parent: EditorView) { self.parent = parent }
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }

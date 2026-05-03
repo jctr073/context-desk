@@ -22,6 +22,8 @@ enum OpenAIService {
 
     static func improve(
         input: String,
+        context: String = "",
+        customInstructions: String = "",
         operation: WritingOp,
         formats: Set<OutputFormat>,
         model: AIModel,
@@ -36,7 +38,9 @@ enum OpenAIService {
                 model: model,
                 operation: operation,
                 formats: formats,
-                input: input
+                input: input,
+                context: context,
+                customInstructions: customInstructions
             )
         )
 
@@ -74,14 +78,39 @@ private struct ImprovementRequest: Encodable {
     let instructions: String
     let input: String
 
-    init(model: AIModel, operation: WritingOp, formats: Set<OutputFormat>, input: String) {
+    init(
+        model: AIModel,
+        operation: WritingOp,
+        formats: Set<OutputFormat>,
+        input: String,
+        context: String,
+        customInstructions: String
+    ) {
         self.model = model.apiModelID
         self.reasoning = model.reasoningEffort.map { Reasoning(effort: $0.rawValue) }
-        self.instructions = """
-        \(operation.openAIInstructions)
 
-        \(OutputFormat.openAIGuidance(for: formats))
-        """
+        var sections: [String] = [
+            operation.openAIInstructions,
+            OutputFormat.openAIGuidance(for: formats),
+        ]
+
+        let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedContext.isEmpty {
+            sections.append("""
+            Reference context (use as supporting material — do not rewrite it directly). Treat it as examples to emulate, additional details to weave in, or background to draw on so the rewrite is richer, more accurate, and better aligned in tone, voice, and audience:
+            \(trimmedContext)
+            """)
+        }
+
+        let trimmedCustom = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedCustom.isEmpty {
+            sections.append("""
+            Custom direction from the user — treat this as an additional op in their own words, on top of the named operation above. Apply it together with that operation's treatment to shape how the rewrite is approached:
+            \(trimmedCustom)
+            """)
+        }
+
+        self.instructions = sections.joined(separator: "\n\n")
         self.input = input
     }
 }

@@ -1,8 +1,26 @@
 import SwiftUI
 
+enum InputTab: String, CaseIterable, Identifiable, Hashable {
+    case input
+    case context
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .input:   return "Input"
+        case .context: return "Context"
+        }
+    }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var input: String = ""
+    @Published var context: String = ""
+    @Published var customInstructions: String = ""
+    @Published var inputTab: InputTab = .input
+    @Published var editingInstructions: Bool = false
     @Published var ops: Set<WritingOp> = [.cleanup]
     @Published var fmts: Set<OutputFormat> = [.paragraphs]
     @Published var output: [OutputBlock]? = nil
@@ -21,12 +39,12 @@ final class AppState: ObservableObject {
     private var runTask: Task<Void, Never>?
 
     init() {
-        self.configuredProviders = Set(AIProvider.allCases.filter { KeychainStore.exists(for: $0) })
+        self.configuredProviders = Self.configuredProviderSet()
         self.history = HistoryStore.load()
     }
 
     func hasKey(for provider: AIProvider) -> Bool {
-        configuredProviders.contains(provider)
+        configuredProviders.contains(provider) || APIKeyStore.exists(for: provider)
     }
 
     func startAddingKey(_ provider: AIProvider) {
@@ -57,9 +75,14 @@ final class AppState: ObservableObject {
     }
 
     var wordCount: Int {
-        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = inputTab == .input ? input : context
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return 0 }
         return trimmed.split { $0.isWhitespace }.count
+    }
+
+    var hasCustomInstructions: Bool {
+        !customInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     func toggleOp(_ op: WritingOp) {
@@ -79,18 +102,24 @@ final class AppState: ObservableObject {
         guard canRun else { return }
         runTask?.cancel()
         let snapshotInput = input
+        let snapshotContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
+        let snapshotInstructions = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
         let snapshotOps = ops
         let snapshotFmts = fmts
         let snapshotModel = model
         let snapshotOp = WritingOp.allCases.first { snapshotOps.contains($0) } ?? .cleanup
 
         if snapshotModel.provider == .openai {
-            guard let apiKey = KeychainStore.read(for: .openai) else {
+            configuredProviders = Self.configuredProviderSet()
+
+            guard let apiKey = APIKeyStore.read(for: .openai) else {
                 startAddingKey(.openai)
                 return
             }
             runOpenAIImprove(
                 input: snapshotInput,
+                context: snapshotContext,
+                customInstructions: snapshotInstructions,
                 operation: snapshotOp,
                 formats: snapshotFmts,
                 model: snapshotModel,
@@ -122,8 +151,14 @@ final class AppState: ObservableObject {
         }
     }
 
+    private static func configuredProviderSet() -> Set<AIProvider> {
+        Set(AIProvider.allCases.filter { APIKeyStore.exists(for: $0) })
+    }
+
     private func runOpenAIImprove(
         input: String,
+        context: String,
+        customInstructions: String,
         operation: WritingOp,
         formats: Set<OutputFormat>,
         model: AIModel,
@@ -135,6 +170,8 @@ final class AppState: ObservableObject {
             do {
                 let blocks = try await OpenAIService.improve(
                     input: input,
+                    context: context,
+                    customInstructions: customInstructions,
                     operation: operation,
                     formats: formats,
                     model: model,
@@ -203,6 +240,7 @@ final class AppState: ObservableObject {
         runTask?.cancel()
         running = false
         input = item.input
+        inputTab = .input
         output = item.output
         ops = [item.operation]
         fmts = item.formats.isEmpty ? [.paragraphs] : item.formats
@@ -216,8 +254,24 @@ final class AppState: ObservableObject {
         runTask?.cancel()
         running = false
         input = ""
+        context = ""
+        customInstructions = ""
+        inputTab = .input
         output = nil
         activeRecentID = nil
+    }
+
+    func startEditingInstructions() {
+        editingInstructions = true
+    }
+
+    func cancelEditingInstructions() {
+        editingInstructions = false
+    }
+
+    func saveCustomInstructions(_ text: String) {
+        customInstructions = text
+        editingInstructions = false
     }
 
     func importSelectedTextFromActiveApp() {
@@ -233,6 +287,7 @@ final class AppState: ObservableObject {
                     self.runTask?.cancel()
                     self.running = false
                     self.input = text
+                    self.inputTab = .input
                     self.output = nil
                     self.activeRecentID = nil
 

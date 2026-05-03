@@ -5,9 +5,9 @@ A macOS writing assistant. Paste in text, pick the transformations you want
 (Paragraphs / Bullets / Tables), then hit **Improve**.
 
 Built in **SwiftUI** for macOS 13+. GPT-5.5 uses the OpenAI Responses API
-with selectable reasoning effort levels, keys stored in Mac Keychain, and
-GPT-5.5 Medium selected by default; other providers still use deterministic
-mock output for now.
+with selectable reasoning effort levels, reads `OPENAI_API_KEY` from
+`~/.zshrc` before falling back to Mac Keychain, and defaults to GPT-5.5
+Medium; other providers still use deterministic mock output for now.
 
 ## Features
 
@@ -91,6 +91,7 @@ WritingBuddy/
 
 GPT-5.5 calls `OpenAIService.improve(input:operation:formats:model:apiKey:)`
 with `model: "gpt-5.5"` and the selected `reasoning.effort`, then returns
-parsed `[OutputBlock]` values. Other model selections still use
-`MockGenerator.generate(input:ops:fmts:model:)` until their providers are
-wired up.
+parsed `[OutputBlock]` values. OpenAI key lookup checks `OPENAI_API_KEY` in
+`~/.zshrc` first, then falls back to the Keychain-saved OpenAI key. Other
+model selections still use `MockGenerator.generate(input:ops:fmts:model:)`
+until their providers are wired up.

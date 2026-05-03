@@ -69,3 +69,120 @@ enum KeychainStore {
         return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 }
+
+enum APIKeyStore {
+    static func read(for provider: AIProvider) -> String? {
+        if provider == .openai, let key = ShellProfileAPIKeyStore.readOpenAIKey() {
+            return key
+        }
+
+        return KeychainStore.read(for: provider)
+    }
+
+    static func exists(for provider: AIProvider) -> Bool {
+        read(for: provider) != nil
+    }
+}
+
+private enum ShellProfileAPIKeyStore {
+    private static let openAIKeyName = "OPENAI_API_KEY"
+
+    private static var zshrcURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".zshrc")
+    }
+
+    static func readOpenAIKey() -> String? {
+        guard let contents = try? String(contentsOf: zshrcURL, encoding: .utf8) else {
+            return nil
+        }
+
+        return shellAssignment(named: openAIKeyName, in: contents)
+    }
+
+    private static func shellAssignment(named variable: String, in contents: String) -> String? {
+        var parsedValue: String?
+
+        for line in contents.components(separatedBy: .newlines) {
+            guard let value = shellAssignment(named: variable, fromLine: line) else {
+                continue
+            }
+            parsedValue = value
+        }
+
+        return parsedValue
+    }
+
+    private static func shellAssignment(named variable: String, fromLine rawLine: String) -> String? {
+        var line = rawLine.trimmingCharacters(in: .whitespaces)
+        guard !line.isEmpty, !line.hasPrefix("#") else { return nil }
+
+        for prefix in ["export ", "typeset -x ", "typeset -gx ", "declare -x "] {
+            if line.hasPrefix(prefix) {
+                line.removeFirst(prefix.count)
+                line = line.trimmingCharacters(in: .whitespaces)
+                break
+            }
+        }
+
+        guard line.hasPrefix(variable) else { return nil }
+
+        var remainder = line.dropFirst(variable.count)
+        remainder = remainder.drop(while: { $0 == " " || $0 == "\t" })
+        guard remainder.first == "=" else { return nil }
+
+        remainder = remainder.dropFirst()
+        let value = shellValue(from: String(remainder).trimmingCharacters(in: .whitespaces))
+
+        guard !value.isEmpty,
+              !value.hasPrefix("$"),
+              !value.contains("$("),
+              !value.contains("`") else {
+            return nil
+        }
+
+        return value
+    }
+
+    private static func shellValue(from rawValue: String) -> String {
+        guard let first = rawValue.first else { return "" }
+
+        if first == "'" {
+            return String(rawValue.dropFirst().prefix { $0 != "'" })
+        }
+
+        if first == "\"" {
+            return doubleQuotedValue(from: rawValue)
+        }
+
+        return String(rawValue.prefix { char in
+            !char.isWhitespace && char != "#" && char != ";"
+        })
+    }
+
+    private static func doubleQuotedValue(from rawValue: String) -> String {
+        var value = ""
+        var isEscaped = false
+
+        for char in rawValue.dropFirst() {
+            if isEscaped {
+                value.append(char)
+                isEscaped = false
+                continue
+            }
+
+            if char == "\\" {
+                isEscaped = true
+                continue
+            }
+
+            if char == "\"" {
+                break
+            }
+
+            value.append(char)
+        }
+
+        return value
+    }
+}

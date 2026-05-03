@@ -36,4 +36,25 @@ enum WritingOp: String, CaseIterable, Identifiable, Hashable {
     }
 
     var kbdHint: String { "\u{2318}\(keyEquivalent)" }
+
+    var openAIInstructions: String {
+        switch self {
+        case .rephrase:
+            return """
+            Rephrase the user's writing. Preserve the original meaning and important details, improve wording and flow, keep roughly the same length, and return only the revised text as a single paragraph.
+            """
+        case .expand:
+            return """
+            Expand the user's writing. Preserve the original meaning, add useful context and connective detail without inventing facts, improve clarity and flow, and return only the revised text as a single paragraph.
+            """
+        case .shorten:
+            return """
+            Shorten the user's writing. Preserve the core meaning and important details, remove redundancy, keep it concise and clear, and return only the revised text as a single paragraph.
+            """
+        case .cleanup:
+            return """
+            Clean up the user's writing. Preserve the original meaning, keep it concise, fix grammar and punctuation, improve clarity and flow, and return only the revised text as a single paragraph.
+            """
+        }
+    }
 }

@@ -68,7 +68,7 @@ struct ContentView: View {
     }
 }
 
-/// Invisible buttons that bind ⌘1-⌘4 to op toggles.
+/// Invisible buttons that bind ⌘1-⌘4 to operation selection.
 private struct KeyboardShortcuts: View {
     @ObservedObject var state: AppState
     var body: some View {

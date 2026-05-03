@@ -376,7 +376,7 @@ final class AppState: ObservableObject {
         editingInstructions = false
     }
 
-    func importSelectedTextFromActiveApp() {
+    func importSelectedTextFromActiveApp(to targetTab: InputTab = .input) {
         Task { [weak self] in
             let result = await SelectedTextCapture.capture()
 
@@ -388,18 +388,14 @@ final class AppState: ObservableObject {
                 case .success(let text):
                     self.runTask?.cancel()
                     self.running = false
-                    self.input = text
-                    self.inputImages = []
-                    self.contextImages = []
-                    self.lastAddedImageID = nil
-                    self.inputTab = .input
+                    self.applyImportedSelectedText(text, to: targetTab)
                     self.output = nil
                     self.activeRecentID = nil
 
                 case .accessibilityPermissionNeeded:
                     self.running = false
                     self.output = [
-                        .paragraph(text: "WritingBuddy needs Accessibility permission to copy selected text from other apps. Enable it in System Settings, then try Control-A again.")
+                        .paragraph(text: "WritingBuddy needs Accessibility permission to copy selected text from other apps. Enable it in System Settings, then try Control-A or Control-Q again.")
                     ]
 
                 case .noText:
@@ -410,6 +406,20 @@ final class AppState: ObservableObject {
                 }
             }
         }
+    }
+
+    private func applyImportedSelectedText(_ text: String, to targetTab: InputTab) {
+        switch targetTab {
+        case .input:
+            input = text
+            inputImages = []
+            contextImages = []
+        case .context:
+            context = text
+            contextImages = []
+        }
+        lastAddedImageID = nil
+        inputTab = targetTab
     }
 
     func copyOutput() {

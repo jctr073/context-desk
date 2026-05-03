@@ -185,6 +185,12 @@ private struct ImprovementPrompt {
             """)
         }
 
+        sections.append("""
+        Global output rules (apply to every response, override any conflicting guidance above):
+        - Never use em dashes (—, U+2014) in the output. This applies to all prose, bullets, headings, table cells, and any other generated text.
+        - Do not substitute en dashes (–) for em dashes either. Rewrite the sentence using a comma, semicolon, colon, parentheses, or two shorter sentences instead.
+        """)
+
         self.instructions = sections.joined(separator: "\n\n")
     }
 }

@@ -18,18 +18,46 @@ output for now.
   4.7 effort levels.
 - Multi-select operation chips with keyboard shortcuts (⌘1 – ⌘4).
 - Multi-select output format chips (Paragraphs, Bullets, Tables).
+- Input and context image attachments via picker, paste, or drag and drop.
+- Attached images are previewed inline, can be opened in a lightbox, and are
+  included in live OpenAI / Anthropic requests.
 - System-wide Control-A import: copies selected text from any app into the
   input editor while WritingBuddy is running.
+- Collapsible history sidebar with saved text, context, images, and outputs.
 - Stacked or side-by-side layout (toggle via the floating Tweaks panel).
 - Light & dark themes (toggle via Tweaks).
-- History sidebar with saved runs and a "+" to start a new session
-  (⌘N).
+- History sidebar "+" starts a new session (⌘N).
 - Diff view that highlights additions / deletions vs. the original input.
 - Streaming-style skeleton placeholder while a run is in progress.
 
-## Build & run
+## Setup
 
 Requires **Xcode 15+** and **macOS 13+**.
+
+```sh
+git clone https://github.com/jctr073/writing-buddy.git
+cd writing-buddy
+xcode-select --install
+```
+
+`xcode-select --install` is only needed if the Xcode command-line tools are
+not already installed.
+
+Live OpenAI and Anthropic requests need API keys. The app checks shell-profile
+assignments in `~/.zshrc` first, then falls back to keys saved through the app
+into Mac Keychain:
+
+```sh
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+# Optional for future Google/Gemini support:
+export GOOGLE_API_KEY="AIza..."
+```
+
+Google/Gemini appears in the picker for future support, but still uses mock
+output until a live Google client is added.
+
+## Run From Xcode
 
 ```sh
 open WritingBuddy.xcodeproj
@@ -38,18 +66,57 @@ open WritingBuddy.xcodeproj
 Press ⌘R in Xcode. The app launches with an empty editor; completed runs
 are saved into the history sidebar.
 
-For a command-line release build:
+## Build From Scripts
+
+Build a release app bundle:
 
 ```sh
-scripts/build-app.sh
+./scripts/build-app.sh
 ```
 
-The packaged app is written to `.build/app/WritingBuddy.app`. To build and
-copy it into `/Applications`:
+The packaged app is written to `.build/app/WritingBuddy.app`. The script also
+generates the app icon, copies it into the bundle, and ad-hoc signs the app
+when `codesign` is available.
+
+Build a debug app bundle with the same script:
 
 ```sh
-scripts/install-system.sh
+CONFIGURATION=Debug ./scripts/build-app.sh
 ```
+
+Build and install into `/Applications`:
+
+```sh
+./scripts/install-system.sh
+```
+
+`install-system.sh` runs `build-app.sh`, copies the app to
+`/Applications/WritingBuddy.app`, fixes permissions, and removes quarantine
+metadata when possible. It uses `sudo` only when `/Applications` is not
+writable by the current user.
+
+Regenerate just the iconset, if you are iterating on the icon script:
+
+```sh
+./scripts/create-icon.swift .build/app-icon.iconset
+iconutil -c icns .build/app-icon.iconset -o .build/WritingBuddy.icns
+```
+
+## Direct Xcode Build
+
+For CI-style local verification without packaging:
+
+```sh
+xcodebuild \
+  -project WritingBuddy.xcodeproj \
+  -scheme WritingBuddy \
+  -configuration Debug \
+  -derivedDataPath .build/xcode-debug \
+  build
+```
+
+There is no separate test target in the repo yet, so the main verification
+step is a successful Xcode build.
 
 ## Project layout
 
@@ -66,6 +133,7 @@ WritingBuddy/
     OutputBlock.swift       — paragraph | heading | bulletList | table
     RecentItem.swift        — persisted history items
     AIModel.swift           — model list
+    AttachedImage.swift     — image loading, metadata, and base64 payloads
     OpenAIService.swift     — provider-dispatched AI writing clients
     GlobalSelectionShortcut.swift — system-wide selected-text import
     MockGenerator.swift     — deterministic fallback generator
@@ -82,6 +150,7 @@ WritingBuddy/
     StreamingPlaceholder.swift — pulsing skeleton bars
     TweaksPanel.swift       — floating theme/layout toggles
     Components/
+      ImageLightbox.swift   — attached-image preview modal
       Chip.swift            — multi-select toolbar chip
       IconButton.swift      — square icon-only toolbar button
       Kbd.swift             — keyboard-key visual
@@ -93,11 +162,13 @@ WritingBuddy/
 
 Live models call `AIWritingService.improve(input:context:customInstructions:operation:formats:model:apiKey:)`.
 The UI passes one provider-neutral request: input text, reference context,
-custom instructions, selected operation, selected output formats, and model.
+custom instructions, input/context images, selected operation, selected output
+formats, and model.
 `AIWritingService` then maps that request to the selected provider's API:
-OpenAI receives `instructions` + `input` through the Responses API, while
-Anthropic receives the same instructions as the Messages API `system` value
-and the input as the user message. Claude Opus 4.7 effort variants are sent
-as Anthropic `output_config.effort` with adaptive thinking enabled. Provider
-key lookup checks the provider's environment variable names in `~/.zshrc`
-first, then falls back to the Keychain-saved key.
+OpenAI receives `instructions` plus a text or multimodal `input` through the
+Responses API, while Anthropic receives the same instructions as the Messages
+API `system` value and sends text/images as user content blocks. Claude Opus
+4.7 effort variants are sent as Anthropic `output_config.effort` with
+adaptive thinking enabled. Provider key lookup checks the provider's
+environment variable names in `~/.zshrc` first, then falls back to the
+Keychain-saved key.

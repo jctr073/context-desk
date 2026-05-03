@@ -77,9 +77,10 @@ final class AppState: ObservableObject {
     }
 
     var canRun: Bool {
-        let hasText = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hasImages = !inputImages.isEmpty || !contextImages.isEmpty
-        return (hasText || hasImages)
+        let hasInputText = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasInputImages = !inputImages.isEmpty
+        let canUseImageOnlyInput = AIWritingService.supports(model.provider)
+        return (hasInputText || (hasInputImages && canUseImageOnlyInput))
             && !(ops.isEmpty && fmts.isEmpty)
             && !running
     }

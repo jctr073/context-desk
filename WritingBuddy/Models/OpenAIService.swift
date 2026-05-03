@@ -207,7 +207,10 @@ private struct OpenAIImprovementRequest: Encodable {
             for img in prompt.inputImages {
                 parts.append(.image(url: img.dataURL))
             }
-            parts.append(.text(prompt.input))
+            let trimmedInput = prompt.input.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedInput.isEmpty {
+                parts.append(.text(prompt.input))
+            }
             self.input = .multimodal([
                 OpenAIInputItem(role: "user", content: parts)
             ])
@@ -301,7 +304,10 @@ private struct AnthropicImprovementRequest: Encodable {
             for img in prompt.inputImages {
                 blocks.append(.image(mediaType: img.mimeType, data: img.base64))
             }
-            blocks.append(.text(prompt.input))
+            let trimmedInput = prompt.input.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedInput.isEmpty {
+                blocks.append(.text(prompt.input))
+            }
             self.messages = [AnthropicMessage(role: "user", content: .blocks(blocks))]
         } else {
             self.messages = [AnthropicMessage(role: "user", content: .text(prompt.input))]

@@ -58,7 +58,10 @@ struct RecentItem: Identifiable, Hashable, Codable {
 
     var title: String {
         let text = compacted(input)
-        guard !text.isEmpty else { return "Untitled note" }
+        guard !text.isEmpty else {
+            guard !inputImages.isEmpty else { return "Untitled note" }
+            return inputImages.count == 1 ? "Image input" : "\(inputImages.count) image inputs"
+        }
 
         if let sentenceEnd = text.firstIndex(where: { ".?!".contains($0) }) {
             let sentence = String(text[...sentenceEnd])
@@ -70,7 +73,22 @@ struct RecentItem: Identifiable, Hashable, Codable {
 
     var preview: String {
         let text = compacted(input)
-        return text.isEmpty ? "No input text" : clipped(text, maxLength: 56)
+        if !text.isEmpty {
+            return clipped(text, maxLength: 56)
+        }
+
+        var parts: [String] = []
+        if !inputImages.isEmpty {
+            parts.append(inputImages.count == 1 ? "1 input image" : "\(inputImages.count) input images")
+        }
+        if !contextImages.isEmpty {
+            parts.append(contextImages.count == 1 ? "1 context image" : "\(contextImages.count) context images")
+        }
+        let contextText = compacted(context)
+        if !contextText.isEmpty {
+            parts.append("Context: \(clipped(contextText, maxLength: 36))")
+        }
+        return parts.isEmpty ? "No input text" : parts.joined(separator: " + ")
     }
 
     var when: String {
@@ -114,7 +132,7 @@ struct RecentItem: Identifiable, Hashable, Codable {
 
 enum HistoryStore {
     private static let key = "WritingBuddy.history.v1"
-    static let maxItems = 50
+    static let maxItems = 15
 
     static func load() -> [RecentItem] {
         guard let data = UserDefaults.standard.data(forKey: key) else {
@@ -122,9 +140,10 @@ enum HistoryStore {
         }
 
         do {
-            return try JSONDecoder()
+            let items = try JSONDecoder()
                 .decode([RecentItem].self, from: data)
                 .sorted { $0.createdAt > $1.createdAt }
+            return Array(items.prefix(maxItems))
         } catch {
             return []
         }

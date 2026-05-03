@@ -34,6 +34,18 @@ struct OutputPane: View {
                 .frame(width: 1, height: 18)
                 .padding(.horizontal, 2)
 
+            SegmentedToggle(
+                options: RenderMode.allCases,
+                label: { $0.label },
+                selection: $state.renderMode,
+                palette: palette
+            )
+
+            Rectangle()
+                .fill(palette.border)
+                .frame(width: 1, height: 18)
+                .padding(.horizontal, 2)
+
             IconButton(palette: palette,
                        isActive: state.diffMode,
                        help: "Show diff",
@@ -76,7 +88,9 @@ struct OutputPane: View {
             } else if state.diffMode {
                 DiffView(original: state.input, current: state.output, palette: palette)
             } else {
-                OutputBody(blocks: state.output, palette: palette)
+                OutputBody(blocks: state.output,
+                           renderMode: state.renderMode,
+                           palette: palette)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

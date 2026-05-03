@@ -48,22 +48,46 @@ enum AIProvider: String, CaseIterable, Identifiable, Hashable {
     var keychainAccount: String { rawValue }
 }
 
+enum ReasoningEffort: String, Codable, Hashable {
+    case low
+    case medium
+    case high
+    case xhigh
+}
+
 struct AIModel: Identifiable, Hashable {
     let id: String
     let name: String
     let provider: AIProvider
+    let apiModelID: String
+    let reasoningEffort: ReasoningEffort?
+
+    init(
+        id: String,
+        name: String,
+        provider: AIProvider,
+        apiModelID: String? = nil,
+        reasoningEffort: ReasoningEffort? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.provider = provider
+        self.apiModelID = apiModelID ?? id
+        self.reasoningEffort = reasoningEffort
+    }
 
     static let claudeSonnet45 = AIModel(id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", provider: .anthropic)
     static let claudeOpus4    = AIModel(id: "claude-opus-4",     name: "Claude Opus 4",     provider: .anthropic)
     static let claudeHaiku45  = AIModel(id: "claude-haiku-4.5",  name: "Claude Haiku 4.5",  provider: .anthropic)
-    static let gpt55          = AIModel(id: "gpt-5.5",           name: "GPT-5.5",           provider: .openai)
-    static let gpt41          = AIModel(id: "gpt-4.1",           name: "GPT-4.1",           provider: .openai)
-    static let gpt41mini      = AIModel(id: "gpt-4.1-mini",      name: "GPT-4.1 mini",      provider: .openai)
+    static let gpt55Low       = AIModel(id: "gpt-5.5-low",       name: "GPT-5.5 Low",       provider: .openai, apiModelID: "gpt-5.5", reasoningEffort: .low)
+    static let gpt55Medium    = AIModel(id: "gpt-5.5-medium",    name: "GPT-5.5 Medium",    provider: .openai, apiModelID: "gpt-5.5", reasoningEffort: .medium)
+    static let gpt55High      = AIModel(id: "gpt-5.5-high",      name: "GPT-5.5 High",      provider: .openai, apiModelID: "gpt-5.5", reasoningEffort: .high)
+    static let gpt55XHigh     = AIModel(id: "gpt-5.5-xhigh",     name: "GPT-5.5 xhigh",     provider: .openai, apiModelID: "gpt-5.5", reasoningEffort: .xhigh)
     static let gemini25Pro    = AIModel(id: "gemini-2.5-pro",    name: "Gemini 2.5 Pro",    provider: .google)
 
     static let all: [AIModel] = [
         .claudeSonnet45, .claudeOpus4, .claudeHaiku45,
-        .gpt55, .gpt41, .gpt41mini,
+        .gpt55Low, .gpt55Medium, .gpt55High, .gpt55XHigh,
         .gemini25Pro,
     ]
 
@@ -72,6 +96,9 @@ struct AIModel: Identifiable, Hashable {
     }
 
     static func model(withID id: String) -> AIModel? {
-        all.first { $0.id == id }
+        if ["gpt-5.5", "gpt-4.1", "gpt-4.1-mini"].contains(id) {
+            return .gpt55Medium
+        }
+        return all.first { $0.id == id }
     }
 }

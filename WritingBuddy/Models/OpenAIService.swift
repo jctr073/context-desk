@@ -33,7 +33,7 @@ enum OpenAIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(
             ImprovementRequest(
-                model: model.id,
+                model: model,
                 operation: operation,
                 formats: formats,
                 input: input
@@ -70,11 +70,13 @@ enum OpenAIService {
 
 private struct ImprovementRequest: Encodable {
     let model: String
+    let reasoning: Reasoning?
     let instructions: String
     let input: String
 
-    init(model: String, operation: WritingOp, formats: Set<OutputFormat>, input: String) {
-        self.model = model
+    init(model: AIModel, operation: WritingOp, formats: Set<OutputFormat>, input: String) {
+        self.model = model.apiModelID
+        self.reasoning = model.reasoningEffort.map { Reasoning(effort: $0.rawValue) }
         self.instructions = """
         \(operation.openAIInstructions)
 
@@ -82,6 +84,10 @@ private struct ImprovementRequest: Encodable {
         """
         self.input = input
     }
+}
+
+private struct Reasoning: Encodable {
+    let effort: String
 }
 
 private struct ResponseBody: Decodable {

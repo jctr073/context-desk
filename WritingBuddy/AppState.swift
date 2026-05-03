@@ -8,9 +8,10 @@ final class AppState: ObservableObject {
     @Published var output: [OutputBlock]? = nil
     @Published var running: Bool = false
     @Published var diffMode: Bool = false
+    @Published var renderMode: RenderMode = .rendered
     @Published var activeRecentID: String? = nil
     @Published var history: [RecentItem] = []
-    @Published var model: AIModel = .gpt55
+    @Published var model: AIModel = .gpt55Medium
     @Published var theme: AppTheme = .light
     @Published var layout: PaneLayout = .stacked
     @Published var copiedFlash: Bool = false
@@ -83,7 +84,7 @@ final class AppState: ObservableObject {
         let snapshotModel = model
         let snapshotOp = WritingOp.allCases.first { snapshotOps.contains($0) } ?? .cleanup
 
-        if snapshotModel == .gpt55 {
+        if snapshotModel.provider == .openai {
             guard let apiKey = KeychainStore.read(for: .openai) else {
                 startAddingKey(.openai)
                 return
@@ -219,9 +220,43 @@ final class AppState: ObservableObject {
         activeRecentID = nil
     }
 
+    func importSelectedTextFromActiveApp() {
+        Task { [weak self] in
+            let result = await SelectedTextCapture.capture()
+
+            await MainActor.run {
+                guard let self else { return }
+                NSApp.activate(ignoringOtherApps: true)
+
+                switch result {
+                case .success(let text):
+                    self.runTask?.cancel()
+                    self.running = false
+                    self.input = text
+                    self.output = nil
+                    self.activeRecentID = nil
+
+                case .accessibilityPermissionNeeded:
+                    self.running = false
+                    self.output = [
+                        .paragraph(text: "WritingBuddy needs Accessibility permission to copy selected text from other apps. Enable it in System Settings, then try Control-A again.")
+                    ]
+
+                case .noText:
+                    self.running = false
+                    self.output = [
+                        .paragraph(text: "No selected text was available to import.")
+                    ]
+                }
+            }
+        }
+    }
+
     func copyOutput() {
         guard let blocks = output else { return }
-        let text = MockGenerator.plainText(from: blocks)
+        let text = renderMode == .raw
+            ? blocks.markdown
+            : MockGenerator.plainText(from: blocks)
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(text, forType: .string)

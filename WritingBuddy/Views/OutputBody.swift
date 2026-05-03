@@ -2,19 +2,25 @@ import SwiftUI
 
 struct OutputBody: View {
     let blocks: [OutputBlock]?
+    let renderMode: RenderMode
     let palette: Palette
 
     var body: some View {
         if let blocks = blocks, !blocks.isEmpty {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                        renderBlock(block)
+            switch renderMode {
+            case .rendered:
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                            renderBlock(block)
+                        }
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 14)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            case .raw:
+                RawMarkdownView(text: blocks.markdown, palette: palette)
             }
         } else {
             EmptyOutputState(palette: palette)
@@ -109,6 +115,23 @@ private struct TableBlock: View {
                 .stroke(palette.border, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct RawMarkdownView: View {
+    let text: String
+    let palette: Palette
+
+    var body: some View {
+        ScrollView {
+            Text(text)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundColor(palette.text)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+        }
     }
 }
 

@@ -5,15 +5,19 @@ A macOS writing assistant. Paste in text, pick the transformations you want
 (Paragraphs / Bullets / Tables), then hit **Improve**.
 
 Built in **SwiftUI** for macOS 13+. GPT-5.5 uses the OpenAI Responses API
-with keys stored in Mac Keychain; other providers still use deterministic
+with selectable reasoning effort levels, keys stored in Mac Keychain, and
+GPT-5.5 Medium selected by default; other providers still use deterministic
 mock output for now.
 
 ## Features
 
 - macOS-style window with custom titlebar, traffic lights, and a model
   picker tucked in the top-right.
+- GPT-5.5 Low / Medium / High / xhigh model picker options.
 - Multi-select operation chips with keyboard shortcuts (⌘1 – ⌘4).
 - Multi-select output format chips (Paragraphs, Bullets, Tables).
+- System-wide Control-A import: copies selected text from any app into the
+  input editor while WritingBuddy is running.
 - Stacked or side-by-side layout (toggle via the floating Tweaks panel).
 - Light & dark themes (toggle via Tweaks).
 - History sidebar with saved runs and a "+" to start a new session
@@ -61,6 +65,7 @@ WritingBuddy/
     RecentItem.swift        — persisted history items
     AIModel.swift           — model list
     OpenAIService.swift     — OpenAI Responses API client
+    GlobalSelectionShortcut.swift — system-wide selected-text import
     MockGenerator.swift     — deterministic fallback generator
     DiffEngine.swift        — LCS-based word diff
   Views/
@@ -85,6 +90,7 @@ WritingBuddy/
 ## Model routing
 
 GPT-5.5 calls `OpenAIService.improve(input:operation:formats:model:apiKey:)`
-and returns parsed `[OutputBlock]` values. Other model selections still use
+with `model: "gpt-5.5"` and the selected `reasoning.effort`, then returns
+parsed `[OutputBlock]` values. Other model selections still use
 `MockGenerator.generate(input:ops:fmts:model:)` until their providers are
 wired up.

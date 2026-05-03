@@ -4,6 +4,9 @@ struct RecentItem: Identifiable, Hashable, Codable {
     let id: String
     let createdAt: Date
     let input: String
+    let context: String
+    let inputImages: [AttachedImage]
+    let contextImages: [AttachedImage]
     let output: [OutputBlock]
     let operation: WritingOp
     let formats: Set<OutputFormat>
@@ -13,6 +16,9 @@ struct RecentItem: Identifiable, Hashable, Codable {
         id: String = UUID().uuidString,
         createdAt: Date = Date(),
         input: String,
+        context: String = "",
+        inputImages: [AttachedImage] = [],
+        contextImages: [AttachedImage] = [],
         output: [OutputBlock],
         operation: WritingOp,
         formats: Set<OutputFormat>,
@@ -21,15 +27,41 @@ struct RecentItem: Identifiable, Hashable, Codable {
         self.id = id
         self.createdAt = createdAt
         self.input = input
+        self.context = context
+        self.inputImages = inputImages
+        self.contextImages = contextImages
         self.output = output
         self.operation = operation
         self.formats = formats.isEmpty ? [.paragraphs] : formats
         self.modelID = modelID
     }
 
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.createdAt = try c.decode(Date.self, forKey: .createdAt)
+        self.input = try c.decode(String.self, forKey: .input)
+        self.context = (try? c.decode(String.self, forKey: .context)) ?? ""
+        self.inputImages = (try? c.decode([AttachedImage].self, forKey: .inputImages)) ?? []
+        self.contextImages = (try? c.decode([AttachedImage].self, forKey: .contextImages)) ?? []
+        self.output = try c.decode([OutputBlock].self, forKey: .output)
+        self.operation = try c.decode(WritingOp.self, forKey: .operation)
+        let fmts = try c.decode(Set<OutputFormat>.self, forKey: .formats)
+        self.formats = fmts.isEmpty ? [.paragraphs] : fmts
+        self.modelID = try c.decode(String.self, forKey: .modelID)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, createdAt, input, context, inputImages, contextImages
+        case output, operation, formats, modelID
+    }
+
     var title: String {
         let text = compacted(input)
-        guard !text.isEmpty else { return "Untitled note" }
+        guard !text.isEmpty else {
+            guard !inputImages.isEmpty else { return "Untitled note" }
+            return inputImages.count == 1 ? "Image input" : "\(inputImages.count) image inputs"
+        }
 
         if let sentenceEnd = text.firstIndex(where: { ".?!".contains($0) }) {
             let sentence = String(text[...sentenceEnd])
@@ -41,7 +73,22 @@ struct RecentItem: Identifiable, Hashable, Codable {
 
     var preview: String {
         let text = compacted(input)
-        return text.isEmpty ? "No input text" : clipped(text, maxLength: 56)
+        if !text.isEmpty {
+            return clipped(text, maxLength: 56)
+        }
+
+        var parts: [String] = []
+        if !inputImages.isEmpty {
+            parts.append(inputImages.count == 1 ? "1 input image" : "\(inputImages.count) input images")
+        }
+        if !contextImages.isEmpty {
+            parts.append(contextImages.count == 1 ? "1 context image" : "\(contextImages.count) context images")
+        }
+        let contextText = compacted(context)
+        if !contextText.isEmpty {
+            parts.append("Context: \(clipped(contextText, maxLength: 36))")
+        }
+        return parts.isEmpty ? "No input text" : parts.joined(separator: " + ")
     }
 
     var when: String {
@@ -85,7 +132,7 @@ struct RecentItem: Identifiable, Hashable, Codable {
 
 enum HistoryStore {
     private static let key = "WritingBuddy.history.v1"
-    static let maxItems = 50
+    static let maxItems = 15
 
     static func load() -> [RecentItem] {
         guard let data = UserDefaults.standard.data(forKey: key) else {
@@ -93,9 +140,10 @@ enum HistoryStore {
         }
 
         do {
-            return try JSONDecoder()
+            let items = try JSONDecoder()
                 .decode([RecentItem].self, from: data)
                 .sorted { $0.createdAt > $1.createdAt }
+            return Array(items.prefix(maxItems))
         } catch {
             return []
         }

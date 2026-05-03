@@ -35,8 +35,16 @@ final class AppState: ObservableObject {
     @Published var copiedFlash: Bool = false
     @Published var configuredProviders: Set<AIProvider> = []
     @Published var addingKeyFor: AIProvider? = nil
+    @Published var historyVisible: Bool = true
+    @Published var inputImages: [AttachedImage] = []
+    @Published var contextImages: [AttachedImage] = []
+    @Published var lightboxImage: AttachedImage? = nil
+    /// ID of the most-recently-added image, used to drive the bounce/flash animation.
+    @Published var lastAddedImageID: String? = nil
+    @Published var pasteFlash: Bool = false
 
     private var runTask: Task<Void, Never>?
+    private var pasteFlashTask: Task<Void, Never>?
 
     init() {
         self.configuredProviders = Self.configuredProviderSet()
@@ -69,9 +77,66 @@ final class AppState: ObservableObject {
     }
 
     var canRun: Bool {
-        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasInputText = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasInputImages = !inputImages.isEmpty
+        let canUseImageOnlyInput = AIWritingService.supports(model.provider)
+        return (hasInputText || (hasInputImages && canUseImageOnlyInput))
             && !(ops.isEmpty && fmts.isEmpty)
             && !running
+    }
+
+    var currentTabImages: [AttachedImage] {
+        inputTab == .input ? inputImages : contextImages
+    }
+
+    var currentTabImageCount: Int {
+        currentTabImages.count
+    }
+
+    func attachImage(_ image: AttachedImage, to tab: InputTab) {
+        switch tab {
+        case .input:   inputImages.append(image)
+        case .context: contextImages.append(image)
+        }
+        lastAddedImageID = image.id
+        triggerPasteFlash()
+    }
+
+    func attachImages(_ images: [AttachedImage], to tab: InputTab) {
+        guard !images.isEmpty else { return }
+        switch tab {
+        case .input:   inputImages.append(contentsOf: images)
+        case .context: contextImages.append(contentsOf: images)
+        }
+        lastAddedImageID = images.last?.id
+        triggerPasteFlash()
+    }
+
+    func removeImage(_ image: AttachedImage, from tab: InputTab) {
+        switch tab {
+        case .input:   inputImages.removeAll { $0.id == image.id }
+        case .context: contextImages.removeAll { $0.id == image.id }
+        }
+        if lastAddedImageID == image.id {
+            lastAddedImageID = nil
+        }
+    }
+
+    func showLightbox(_ image: AttachedImage) {
+        lightboxImage = image
+    }
+
+    func dismissLightbox() {
+        lightboxImage = nil
+    }
+
+    private func triggerPasteFlash() {
+        pasteFlash = true
+        pasteFlashTask?.cancel()
+        pasteFlashTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_100_000_000)
+            await MainActor.run { self?.pasteFlash = false }
+        }
     }
 
     var wordCount: Int {
@@ -89,6 +154,10 @@ final class AppState: ObservableObject {
         ops = [op]
     }
 
+    func toggleHistoryVisible() {
+        historyVisible.toggle()
+    }
+
     func toggleFormat(_ fmt: OutputFormat) {
         if fmts.contains(fmt) {
             guard fmts.count > 1 else { return }
@@ -104,6 +173,8 @@ final class AppState: ObservableObject {
         let snapshotInput = input
         let snapshotContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
         let snapshotInstructions = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        let snapshotInputImages = inputImages
+        let snapshotContextImages = contextImages
         let snapshotOps = ops
         let snapshotFmts = fmts
         let snapshotModel = model
@@ -121,6 +192,8 @@ final class AppState: ObservableObject {
                 input: snapshotInput,
                 context: snapshotContext,
                 customInstructions: snapshotInstructions,
+                inputImages: snapshotInputImages,
+                contextImages: snapshotContextImages,
                 operation: snapshotOp,
                 formats: snapshotFmts,
                 model: snapshotModel,
@@ -143,6 +216,9 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.finishRun(
                     input: snapshotInput,
+                    context: snapshotContext,
+                    inputImages: snapshotInputImages,
+                    contextImages: snapshotContextImages,
                     operation: snapshotOp,
                     formats: snapshotFmts,
                     model: snapshotModel,
@@ -160,6 +236,8 @@ final class AppState: ObservableObject {
         input: String,
         context: String,
         customInstructions: String,
+        inputImages: [AttachedImage],
+        contextImages: [AttachedImage],
         operation: WritingOp,
         formats: Set<OutputFormat>,
         model: AIModel,
@@ -173,6 +251,8 @@ final class AppState: ObservableObject {
                     input: input,
                     context: context,
                     customInstructions: customInstructions,
+                    inputImages: inputImages,
+                    contextImages: contextImages,
                     operation: operation,
                     formats: formats,
                     model: model,
@@ -182,6 +262,9 @@ final class AppState: ObservableObject {
                 await MainActor.run {
                     self.finishRun(
                         input: input,
+                        context: context,
+                        inputImages: inputImages,
+                        contextImages: contextImages,
                         operation: operation,
                         formats: formats,
                         model: model,
@@ -200,6 +283,9 @@ final class AppState: ObservableObject {
 
     private func finishRun(
         input: String,
+        context: String,
+        inputImages: [AttachedImage],
+        contextImages: [AttachedImage],
         operation: WritingOp,
         formats: Set<OutputFormat>,
         model: AIModel,
@@ -209,6 +295,9 @@ final class AppState: ObservableObject {
         running = false
         addHistoryItem(
             input: input,
+            context: context,
+            inputImages: inputImages,
+            contextImages: contextImages,
             output: blocks,
             operation: operation,
             formats: formats,
@@ -218,6 +307,9 @@ final class AppState: ObservableObject {
 
     private func addHistoryItem(
         input: String,
+        context: String,
+        inputImages: [AttachedImage],
+        contextImages: [AttachedImage],
         output: [OutputBlock],
         operation: WritingOp,
         formats: Set<OutputFormat>,
@@ -225,6 +317,9 @@ final class AppState: ObservableObject {
     ) {
         let item = RecentItem(
             input: input,
+            context: context,
+            inputImages: inputImages,
+            contextImages: contextImages,
             output: output,
             operation: operation,
             formats: formats,
@@ -241,6 +336,9 @@ final class AppState: ObservableObject {
         runTask?.cancel()
         running = false
         input = item.input
+        context = item.context
+        inputImages = item.inputImages
+        contextImages = item.contextImages
         inputTab = .input
         output = item.output
         ops = [item.operation]
@@ -257,6 +355,9 @@ final class AppState: ObservableObject {
         input = ""
         context = ""
         customInstructions = ""
+        inputImages = []
+        contextImages = []
+        lastAddedImageID = nil
         inputTab = .input
         output = nil
         activeRecentID = nil
@@ -288,6 +389,9 @@ final class AppState: ObservableObject {
                     self.runTask?.cancel()
                     self.running = false
                     self.input = text
+                    self.inputImages = []
+                    self.contextImages = []
+                    self.lastAddedImageID = nil
                     self.inputTab = .input
                     self.output = nil
                     self.activeRecentID = nil

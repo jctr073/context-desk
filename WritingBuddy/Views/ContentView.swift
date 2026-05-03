@@ -22,6 +22,7 @@ struct ContentView: View {
 
             apiKeyOverlay(palette: palette)
             instructionsOverlay(palette: palette)
+            lightboxOverlay(palette: palette)
         }
         .frame(minWidth: 760, minHeight: 540)
         .background(WindowAccessor())
@@ -68,11 +69,28 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    private func lightboxOverlay(palette: Palette) -> some View {
+        ZStack {
+            if let image = state.lightboxImage {
+                palette.modalScrim
+                    .ignoresSafeArea()
+                    .onTapGesture { state.dismissLightbox() }
+                    .transition(.opacity)
+
+                ImageLightbox(state: state, image: image, palette: palette)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: state.lightboxImage)
+    }
+
+    @ViewBuilder
     private func body(palette: Palette) -> some View {
         HStack(spacing: 0) {
             HistorySidebar(state: state, palette: palette)
             mainPanes(palette: palette)
         }
+        .animation(.easeInOut(duration: 0.22), value: state.historyVisible)
     }
 
     @ViewBuilder

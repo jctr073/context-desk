@@ -34,6 +34,8 @@ enum AIWritingService {
         input: String,
         context: String = "",
         customInstructions: String = "",
+        inputImages: [AttachedImage] = [],
+        contextImages: [AttachedImage] = [],
         operation: WritingOp,
         formats: Set<OutputFormat>,
         model: AIModel,
@@ -45,7 +47,9 @@ enum AIWritingService {
             formats: formats,
             input: input,
             context: context,
-            customInstructions: customInstructions
+            customInstructions: customInstructions,
+            inputImages: inputImages,
+            contextImages: contextImages
         )
 
         let text: String
@@ -128,6 +132,10 @@ private struct ImprovementPrompt {
     let model: AIModel
     let input: String
     let instructions: String
+    let inputImages: [AttachedImage]
+    let contextImages: [AttachedImage]
+
+    var hasImages: Bool { !inputImages.isEmpty || !contextImages.isEmpty }
 
     init(
         model: AIModel,
@@ -135,10 +143,14 @@ private struct ImprovementPrompt {
         formats: Set<OutputFormat>,
         input: String,
         context: String,
-        customInstructions: String
+        customInstructions: String,
+        inputImages: [AttachedImage] = [],
+        contextImages: [AttachedImage] = []
     ) {
         self.model = model
         self.input = input
+        self.inputImages = inputImages
+        self.contextImages = contextImages
 
         var sections: [String] = [
             operation.instructions,
@@ -161,6 +173,18 @@ private struct ImprovementPrompt {
             """)
         }
 
+        if !contextImages.isEmpty {
+            sections.append("""
+            Reference context images are attached at the start of the user message. Treat them the same way as text context: as supporting material to draw on for tone, audience, or detail — do not transcribe or describe them unless that's plainly what the user wants.
+            """)
+        }
+
+        if !inputImages.isEmpty {
+            sections.append("""
+            Input images are attached after the context images and before the input text. Treat them as part of the input the user wants improved — visual content the user is referring to, asking about, or wants you to fold into the rewrite.
+            """)
+        }
+
         self.instructions = sections.joined(separator: "\n\n")
     }
 }
@@ -169,13 +193,73 @@ private struct OpenAIImprovementRequest: Encodable {
     let model: String
     let reasoning: Reasoning?
     let instructions: String
-    let input: String
+    let input: OpenAIInput
 
     init(prompt: ImprovementPrompt) {
         self.model = prompt.model.apiModelID
         self.reasoning = prompt.model.reasoningEffort.map { Reasoning(effort: $0.rawValue) }
         self.instructions = prompt.instructions
-        self.input = prompt.input
+        if prompt.hasImages {
+            var parts: [OpenAIInputContent] = []
+            for img in prompt.contextImages {
+                parts.append(.image(url: img.dataURL))
+            }
+            for img in prompt.inputImages {
+                parts.append(.image(url: img.dataURL))
+            }
+            let trimmedInput = prompt.input.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedInput.isEmpty {
+                parts.append(.text(prompt.input))
+            }
+            self.input = .multimodal([
+                OpenAIInputItem(role: "user", content: parts)
+            ])
+        } else {
+            self.input = .text(prompt.input)
+        }
+    }
+}
+
+private enum OpenAIInput: Encodable {
+    case text(String)
+    case multimodal([OpenAIInputItem])
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .text(let value):
+            try container.encode(value)
+        case .multimodal(let items):
+            try container.encode(items)
+        }
+    }
+}
+
+private struct OpenAIInputItem: Encodable {
+    let role: String
+    let content: [OpenAIInputContent]
+}
+
+private enum OpenAIInputContent: Encodable {
+    case text(String)
+    case image(url: String)
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case text
+        case imageURL = "image_url"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .text(let value):
+            try c.encode("input_text", forKey: .type)
+            try c.encode(value, forKey: .text)
+        case .image(let url):
+            try c.encode("input_image", forKey: .type)
+            try c.encode(url, forKey: .imageURL)
+        }
     }
 }
 
@@ -187,28 +271,117 @@ private struct AnthropicImprovementRequest: Encodable {
     let model: String
     let maxTokens: Int
     let system: String
+    let thinking: AnthropicThinking?
+    let outputConfig: AnthropicOutputConfig?
     let messages: [AnthropicMessage]
 
     private enum CodingKeys: String, CodingKey {
         case model
         case maxTokens = "max_tokens"
         case system
+        case thinking
+        case outputConfig = "output_config"
         case messages
     }
 
     init(prompt: ImprovementPrompt) {
         self.model = prompt.model.apiModelID
-        self.maxTokens = 4096
+        self.maxTokens = prompt.model.anthropicMaxTokens
         self.system = prompt.instructions
-        self.messages = [
-            AnthropicMessage(role: "user", content: prompt.input)
-        ]
+        if prompt.model.provider == .anthropic,
+           let effort = prompt.model.reasoningEffort {
+            self.thinking = AnthropicThinking(type: "adaptive")
+            self.outputConfig = AnthropicOutputConfig(effort: effort.rawValue)
+        } else {
+            self.thinking = nil
+            self.outputConfig = nil
+        }
+        if prompt.hasImages {
+            var blocks: [AnthropicContentBlock] = []
+            for img in prompt.contextImages {
+                blocks.append(.image(mediaType: img.mimeType, data: img.base64))
+            }
+            for img in prompt.inputImages {
+                blocks.append(.image(mediaType: img.mimeType, data: img.base64))
+            }
+            let trimmedInput = prompt.input.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedInput.isEmpty {
+                blocks.append(.text(prompt.input))
+            }
+            self.messages = [AnthropicMessage(role: "user", content: .blocks(blocks))]
+        } else {
+            self.messages = [AnthropicMessage(role: "user", content: .text(prompt.input))]
+        }
     }
+}
+
+private struct AnthropicThinking: Encodable {
+    let type: String
+}
+
+private struct AnthropicOutputConfig: Encodable {
+    let effort: String
 }
 
 private struct AnthropicMessage: Encodable {
     let role: String
-    let content: String
+    let content: AnthropicMessageContent
+}
+
+private enum AnthropicMessageContent: Encodable {
+    case text(String)
+    case blocks([AnthropicContentBlock])
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .text(let value):
+            try container.encode(value)
+        case .blocks(let blocks):
+            try container.encode(blocks)
+        }
+    }
+}
+
+private enum AnthropicContentBlock: Encodable {
+    case text(String)
+    case image(mediaType: String, data: String)
+
+    private enum CodingKeys: String, CodingKey {
+        case type, text, source
+    }
+
+    private enum SourceKeys: String, CodingKey {
+        case type
+        case mediaType = "media_type"
+        case data
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .text(let value):
+            try c.encode("text", forKey: .type)
+            try c.encode(value, forKey: .text)
+        case .image(let mediaType, let data):
+            try c.encode("image", forKey: .type)
+            var source = c.nestedContainer(keyedBy: SourceKeys.self, forKey: .source)
+            try source.encode("base64", forKey: .type)
+            try source.encode(mediaType, forKey: .mediaType)
+            try source.encode(data, forKey: .data)
+        }
+    }
+}
+
+private extension AIModel {
+    var anthropicMaxTokens: Int {
+        switch reasoningEffort {
+        case .xhigh, .max:
+            return 20_000
+        case .low, .medium, .high, nil:
+            return 4096
+        }
+    }
 }
 
 private struct OpenAIResponseBody: Decodable {

@@ -1,32 +1,38 @@
 # WritingBuddy
 
-A macOS writing assistant. Paste in text, pick the transformations you want
-(Rephrase / Expand / Shorten / Clean up) and the output formats you'd like
-(Paragraphs / Bullets / Tables), then hit **Improve**.
+A macOS writing assistant. Paste in text or attach images, choose a rewrite
+operation (Rephrase / Expand / Shorten / Clean up), pick an output shape
+(Automatic / Paragraphs / Bullets / Tables), then hit **Submit**.
 
 Built in **SwiftUI** for macOS 13+. OpenAI models use the Responses API,
 Claude models use Anthropic's Messages API, API keys are read from shell
-profiles, and the app defaults to GPT-5.5 Medium. Providers without a live
-client still use deterministic mock output for now.
+profiles or the inherited process environment, and the app defaults to GPT-5.5
+Medium. Google/Gemini is present in the picker for future support and still
+uses deterministic mock output for now.
 
 ## Features
 
 - macOS-style window with custom titlebar, traffic lights, and a model
   picker tucked in the top-right.
-- OpenAI GPT-5.5 and Anthropic Claude model picker options, including Opus
-  4.7 effort levels.
-- Multi-select operation chips with keyboard shortcuts (⌘1 – ⌘4).
-- Multi-select output format chips (Paragraphs, Bullets, Tables).
+- Grouped model picker with GPT-5.5 effort levels, Claude Opus 4.7 effort
+  levels, Claude Sonnet 4.6, Claude Haiku 4.5, and a Gemini 2.5 Pro placeholder.
+- Single operation selector with keyboard shortcuts (⌘1 – ⌘4).
+- Automatic output mode plus optional multi-select format chips (Paragraphs,
+  Bullets, Tables).
+- Session-scoped custom instructions that are applied alongside the selected
+  operation.
 - Input and context image attachments via picker, paste, or drag and drop.
 - Attached images are previewed inline, can be opened in a lightbox, and are
   included in live OpenAI / Anthropic requests.
 - System-wide Control-A / Control-Q import: copies selected text from any app
-  into the input or context editor while WritingBuddy is running.
+  into the input or context editor while WritingBuddy is running. macOS
+  Accessibility permission is required the first time this is used.
 - Collapsible history sidebar with saved text, context, images, and outputs.
 - Stacked or side-by-side layout (toggle via the floating Tweaks panel).
 - Light & dark themes (toggle via Tweaks).
 - History sidebar "+" starts a new session (⌘N).
-- Diff view that highlights additions / deletions vs. the original input.
+- Output toolbar with Rendered / Raw modes, copy, regenerate, and diff view
+  that highlights additions / deletions vs. the original input.
 - Streaming-style skeleton placeholder while a run is in progress.
 
 ## Setup
@@ -51,10 +57,14 @@ export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 # Optional for future Google/Gemini support:
 export GOOGLE_API_KEY="AIza..."
+# or:
+export GEMINI_API_KEY="AIza..."
 ```
 
 Google/Gemini appears in the picker for future support, but still uses mock
-output until a live Google client is added.
+output until a live Google client is added. If a live provider key is missing,
+WritingBuddy opens an in-app setup sheet with the exact export line to add; it
+does not save API keys itself.
 
 ## Run From Xcode
 
@@ -110,7 +120,9 @@ xcodebuild \
   -project WritingBuddy.xcodeproj \
   -scheme WritingBuddy \
   -configuration Debug \
+  -destination "generic/platform=macOS" \
   -derivedDataPath .build/xcode-debug \
+  CODE_SIGNING_ALLOWED=NO \
   build
 ```
 
@@ -128,11 +140,14 @@ WritingBuddy/
     Layout.swift            — stacked vs side-by-side enum
   Models/
     Operation.swift         — Rephrase / Expand / Shorten / Clean up
-    OutputFormat.swift      — Paragraphs / Bullets / Tables
-    OutputBlock.swift       — paragraph | heading | bulletList | table
+    OutputFormat.swift      — Automatic guidance + Paragraphs / Bullets / Tables
+    OutputBlock.swift       — paragraph | heading | bulletList | table | codeBlock
+    OutputBlock+Markdown.swift — Markdown export for rendered output blocks
+    RenderMode.swift        — Rendered vs Raw output toggle
     RecentItem.swift        — persisted history items
     AIModel.swift           — model list
     AttachedImage.swift     — image loading, metadata, and base64 payloads
+    APIKeyStore.swift       — shell-profile and environment API-key lookup
     OpenAIService.swift     — provider-dispatched AI writing clients
     GlobalSelectionShortcut.swift — system-wide selected-text import
     MockGenerator.swift     — deterministic fallback generator
@@ -142,7 +157,7 @@ WritingBuddy/
     Titlebar.swift          — gradient titlebar
     ModelPicker.swift       — dropdown menu
     HistorySidebar.swift    — left sidebar with recents
-    InputPane.swift         — toolbar + editor + footer (Improve button)
+    InputPane.swift         — toolbar + editor + footer (Submit button)
     OutputPane.swift        — toolbar + content (output / diff / streaming)
     OutputBody.swift        — renders [OutputBlock]
     DiffView.swift          — renders diff segments
@@ -150,24 +165,28 @@ WritingBuddy/
     TweaksPanel.swift       — floating theme/layout toggles
     Components/
       ImageLightbox.swift   — attached-image preview modal
-      Chip.swift            — multi-select toolbar chip
+      APIKeySetupSheet.swift — provider API-key setup help
+      CustomInstructionsSheet.swift — session instructions editor
+      Chip.swift            — toolbar chip
       IconButton.swift      — square icon-only toolbar button
       Kbd.swift             — keyboard-key visual
+      SegmentedToggle.swift — Rendered / Raw segmented control
       Spinner.swift         — animated loading spinner
       TrafficLightsArea.swift — left-padding spacer for AppKit traffic lights
 ```
 
 ## Model routing
 
-Live models call `AIWritingService.improve(input:context:customInstructions:operation:formats:model:apiKey:)`.
+Live models call `AIWritingService.submit(input:context:customInstructions:inputImages:contextImages:operation:formats:model:apiKey:)`.
 The UI passes one provider-neutral request: input text, reference context,
-custom instructions, input/context images, selected operation, selected output
-formats, and model.
+custom instructions, input/context images, the selected operation, selected
+output formats, and model.
 `AIWritingService` then maps that request to the selected provider's API:
 OpenAI receives `instructions` plus a text or multimodal `input` through the
-Responses API, while Anthropic receives the same instructions as the Messages
-API `system` value and sends text/images as user content blocks. Claude Opus
-4.7 effort variants are sent as Anthropic `output_config.effort` with
-adaptive thinking enabled. Provider key lookup checks the provider's
-environment variable names in shell profiles and the inherited process
-environment. It does not store or read keys from Mac Keychain.
+Responses API, including `reasoning.effort` for GPT-5.5 effort variants, while
+Anthropic receives the same instructions as the Messages API `system` value and
+sends text/images as user content blocks. Claude Opus 4.7 effort variants are
+sent as Anthropic `output_config.effort` with adaptive thinking enabled.
+Provider key lookup checks the provider's environment variable names in shell
+profiles and the inherited process environment. It does not store or read keys
+from Mac Keychain.

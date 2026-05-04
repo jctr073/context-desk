@@ -71,6 +71,8 @@ struct InputPane: View {
 
             attachButton
 
+            resetButton
+
             Rectangle()
                 .fill(palette.border)
                 .frame(width: 1, height: 20)
@@ -186,6 +188,32 @@ struct InputPane: View {
         .help(active
               ? "Custom direction applied to every run (click to edit)"
               : "Add a custom direction for the rewrite")
+    }
+
+    @ViewBuilder
+    private var resetButton: some View {
+        Button(action: { state.newSession() }) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 11, weight: .medium))
+                Text("Reset")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundColor(palette.text)
+            .padding(.horizontal, 11)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(palette.chip)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(palette.chipBorder, lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help("Clear input, context, instructions, images, and output")
     }
 
     @ViewBuilder
@@ -321,7 +349,7 @@ struct InputPane: View {
                     .font(.system(size: 11))
                     .foregroundColor(palette.muted)
             }
-            ImproveButton(state: state, palette: palette)
+            SubmitButton(state: state, palette: palette)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -401,7 +429,7 @@ struct InputPane: View {
     }
 }
 
-private struct ImproveButton: View {
+private struct SubmitButton: View {
     @ObservedObject var state: AppState
     let palette: Palette
 
@@ -414,7 +442,7 @@ private struct ImproveButton: View {
                     Image(systemName: "paperplane.fill")
                         .font(.system(size: 11, weight: .semibold))
                 }
-                Text(state.running ? "Improving\u{2026}" : "Improve")
+                Text(state.running ? "Submitting\u{2026}" : "Submit")
                     .font(.system(size: 12, weight: .semibold))
             }
             .foregroundColor(.white)

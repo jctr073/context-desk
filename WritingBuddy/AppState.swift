@@ -188,7 +188,7 @@ final class AppState: ObservableObject {
                 startAddingKey(provider)
                 return
             }
-            runAIImprove(
+            runAISubmit(
                 input: snapshotInput,
                 context: snapshotContext,
                 customInstructions: snapshotInstructions,
@@ -232,7 +232,7 @@ final class AppState: ObservableObject {
         Set(AIProvider.allCases.filter { APIKeyStore.exists(for: $0) })
     }
 
-    private func runAIImprove(
+    private func runAISubmit(
         input: String,
         context: String,
         customInstructions: String,
@@ -247,7 +247,7 @@ final class AppState: ObservableObject {
         output = nil
         runTask = Task { [weak self] in
             do {
-                let blocks = try await AIWritingService.improve(
+                let blocks = try await AIWritingService.submit(
                     input: input,
                     context: context,
                     customInstructions: customInstructions,

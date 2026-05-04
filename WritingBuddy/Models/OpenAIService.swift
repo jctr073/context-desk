@@ -30,7 +30,7 @@ enum AIWritingService {
         }
     }
 
-    static func improve(
+    static func submit(
         input: String,
         context: String = "",
         customInstructions: String = "",
@@ -41,7 +41,7 @@ enum AIWritingService {
         model: AIModel,
         apiKey: String
     ) async throws -> [OutputBlock] {
-        let prompt = ImprovementPrompt(
+        let prompt = SubmitPrompt(
             model: model,
             operation: operation,
             formats: formats,
@@ -55,9 +55,9 @@ enum AIWritingService {
         let text: String
         switch model.provider {
         case .openai:
-            text = try await OpenAIService.improve(prompt: prompt, apiKey: apiKey)
+            text = try await OpenAIService.submit(prompt: prompt, apiKey: apiKey)
         case .anthropic:
-            text = try await AnthropicService.improve(prompt: prompt, apiKey: apiKey)
+            text = try await AnthropicService.submit(prompt: prompt, apiKey: apiKey)
         case .google:
             throw AIWritingServiceError.unsupportedProvider(model.provider)
         }
@@ -79,12 +79,12 @@ enum AIWritingService {
 private enum OpenAIService {
     private static let endpoint = URL(string: "https://api.openai.com/v1/responses")!
 
-    static func improve(prompt: ImprovementPrompt, apiKey: String) async throws -> String {
+    static func submit(prompt: SubmitPrompt, apiKey: String) async throws -> String {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(OpenAIImprovementRequest(prompt: prompt))
+        request.httpBody = try JSONEncoder().encode(OpenAISubmitRequest(prompt: prompt))
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -105,13 +105,13 @@ private enum AnthropicService {
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     private static let apiVersion = "2023-06-01"
 
-    static func improve(prompt: ImprovementPrompt, apiKey: String) async throws -> String {
+    static func submit(prompt: SubmitPrompt, apiKey: String) async throws -> String {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(AnthropicImprovementRequest(prompt: prompt))
+        request.httpBody = try JSONEncoder().encode(AnthropicSubmitRequest(prompt: prompt))
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -128,7 +128,7 @@ private enum AnthropicService {
     }
 }
 
-private struct ImprovementPrompt {
+private struct SubmitPrompt {
     let model: AIModel
     let input: String
     let instructions: String
@@ -195,13 +195,13 @@ private struct ImprovementPrompt {
     }
 }
 
-private struct OpenAIImprovementRequest: Encodable {
+private struct OpenAISubmitRequest: Encodable {
     let model: String
     let reasoning: Reasoning?
     let instructions: String
     let input: OpenAIInput
 
-    init(prompt: ImprovementPrompt) {
+    init(prompt: SubmitPrompt) {
         self.model = prompt.model.apiModelID
         self.reasoning = prompt.model.reasoningEffort.map { Reasoning(effort: $0.rawValue) }
         self.instructions = prompt.instructions
@@ -273,7 +273,7 @@ private struct Reasoning: Encodable {
     let effort: String
 }
 
-private struct AnthropicImprovementRequest: Encodable {
+private struct AnthropicSubmitRequest: Encodable {
     let model: String
     let maxTokens: Int
     let system: String
@@ -290,7 +290,7 @@ private struct AnthropicImprovementRequest: Encodable {
         case messages
     }
 
-    init(prompt: ImprovementPrompt) {
+    init(prompt: SubmitPrompt) {
         self.model = prompt.model.apiModelID
         self.maxTokens = prompt.model.anthropicMaxTokens
         self.system = prompt.instructions

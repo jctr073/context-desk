@@ -22,7 +22,7 @@ final class AppState: ObservableObject {
     @Published var inputTab: InputTab = .input
     @Published var editingInstructions: Bool = false
     @Published var ops: Set<WritingOp> = [.cleanup]
-    @Published var fmts: Set<OutputFormat> = [.paragraphs]
+    @Published var fmts: Set<OutputFormat> = []
     @Published var output: [OutputBlock]? = nil
     @Published var running: Bool = false
     @Published var diffMode: Bool = false
@@ -61,19 +61,6 @@ final class AppState: ObservableObject {
 
     func cancelAddingKey() {
         addingKeyFor = nil
-    }
-
-    func saveAPIKey(_ key: String) {
-        guard let provider = addingKeyFor else { return }
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        do {
-            try KeychainStore.save(trimmed, for: provider)
-            configuredProviders.insert(provider)
-            addingKeyFor = nil
-        } catch {
-            print("Keychain save failed for \(provider.rawValue):", error)
-        }
     }
 
     var canRun: Bool {
@@ -146,6 +133,14 @@ final class AppState: ObservableObject {
         return trimmed.split { $0.isWhitespace }.count
     }
 
+    var outputWordCount: Int {
+        guard let blocks = output else { return 0 }
+        let trimmed = MockGenerator.plainText(from: blocks)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+        return trimmed.split { $0.isWhitespace }.count
+    }
+
     var hasCustomInstructions: Bool {
         !customInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -158,9 +153,14 @@ final class AppState: ObservableObject {
         historyVisible.toggle()
     }
 
+    var isAutomaticFormat: Bool { fmts.isEmpty }
+
+    func setAutomaticFormat() {
+        fmts.removeAll()
+    }
+
     func toggleFormat(_ fmt: OutputFormat) {
         if fmts.contains(fmt) {
-            guard fmts.count > 1 else { return }
             fmts.remove(fmt)
         } else {
             fmts.insert(fmt)
@@ -188,7 +188,7 @@ final class AppState: ObservableObject {
                 startAddingKey(provider)
                 return
             }
-            runAIImprove(
+            runAISubmit(
                 input: snapshotInput,
                 context: snapshotContext,
                 customInstructions: snapshotInstructions,
@@ -232,7 +232,7 @@ final class AppState: ObservableObject {
         Set(AIProvider.allCases.filter { APIKeyStore.exists(for: $0) })
     }
 
-    private func runAIImprove(
+    private func runAISubmit(
         input: String,
         context: String,
         customInstructions: String,
@@ -247,7 +247,7 @@ final class AppState: ObservableObject {
         output = nil
         runTask = Task { [weak self] in
             do {
-                let blocks = try await AIWritingService.improve(
+                let blocks = try await AIWritingService.submit(
                     input: input,
                     context: context,
                     customInstructions: customInstructions,
@@ -342,7 +342,7 @@ final class AppState: ObservableObject {
         inputTab = .input
         output = item.output
         ops = [item.operation]
-        fmts = item.formats.isEmpty ? [.paragraphs] : item.formats
+        fmts = item.formats
         if let restoredModel = AIModel.model(withID: item.modelID) {
             model = restoredModel
         }

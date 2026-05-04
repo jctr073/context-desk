@@ -45,7 +45,7 @@ struct ContentView: View {
                     .onTapGesture { state.cancelAddingKey() }
                     .transition(.opacity)
 
-                AddAPIKeySheet(state: state, provider: provider, palette: palette)
+                APIKeySetupSheet(state: state, provider: provider, palette: palette)
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
         }

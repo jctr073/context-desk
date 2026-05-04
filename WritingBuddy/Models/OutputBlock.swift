@@ -5,6 +5,7 @@ enum OutputBlock: Identifiable, Hashable, Codable {
     case heading(text: String)
     case bulletList(items: [String])
     case table(head: [String], rows: [[String]])
+    case codeBlock(language: String?, code: String)
 
     var id: String {
         switch self {
@@ -12,6 +13,7 @@ enum OutputBlock: Identifiable, Hashable, Codable {
         case .heading(let t):      return "h:\(t.hashValue)"
         case .bulletList(let it):  return "ul:\(it.hashValue)"
         case .table(let h, let r): return "tbl:\(h.hashValue):\(r.hashValue)"
+        case .codeBlock(let lang, let code): return "cb:\(lang?.hashValue ?? 0):\(code.hashValue)"
         }
     }
 }
@@ -21,6 +23,7 @@ private enum OutputBlockKind: String, Codable {
     case heading
     case bulletList
     case table
+    case codeBlock
 }
 
 private enum OutputBlockCodingKeys: String, CodingKey {
@@ -29,6 +32,8 @@ private enum OutputBlockCodingKeys: String, CodingKey {
     case items
     case head
     case rows
+    case language
+    case code
 }
 
 extension OutputBlock {
@@ -47,6 +52,11 @@ extension OutputBlock {
             self = .table(
                 head: try container.decode([String].self, forKey: .head),
                 rows: try container.decode([[String]].self, forKey: .rows)
+            )
+        case .codeBlock:
+            self = .codeBlock(
+                language: try container.decodeIfPresent(String.self, forKey: .language),
+                code: try container.decode(String.self, forKey: .code)
             )
         }
     }
@@ -68,6 +78,10 @@ extension OutputBlock {
             try container.encode(OutputBlockKind.table, forKey: .kind)
             try container.encode(head, forKey: .head)
             try container.encode(rows, forKey: .rows)
+        case .codeBlock(let language, let code):
+            try container.encode(OutputBlockKind.codeBlock, forKey: .kind)
+            try container.encodeIfPresent(language, forKey: .language)
+            try container.encode(code, forKey: .code)
         }
     }
 }

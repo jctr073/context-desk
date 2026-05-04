@@ -5,10 +5,9 @@ A macOS writing assistant. Paste in text, pick the transformations you want
 (Paragraphs / Bullets / Tables), then hit **Improve**.
 
 Built in **SwiftUI** for macOS 13+. OpenAI models use the Responses API,
-Claude models use Anthropic's Messages API, API keys are read from
-`~/.zshrc` before falling back to Mac Keychain, and the app defaults to
-GPT-5.5 Medium. Providers without a live client still use deterministic mock
-output for now.
+Claude models use Anthropic's Messages API, API keys are read from shell
+profiles, and the app defaults to GPT-5.5 Medium. Providers without a live
+client still use deterministic mock output for now.
 
 ## Features
 
@@ -44,8 +43,8 @@ xcode-select --install
 not already installed.
 
 Live OpenAI and Anthropic requests need API keys. The app checks shell-profile
-assignments in `~/.zshrc` first, then falls back to keys saved through the app
-into Mac Keychain:
+assignments in `~/.zshrc`, `~/.zprofile`, `~/.zshenv`, `~/.profile`,
+`~/.bash_profile`, and `~/.bashrc`, plus the inherited process environment:
 
 ```sh
 export OPENAI_API_KEY="sk-..."
@@ -170,5 +169,5 @@ Responses API, while Anthropic receives the same instructions as the Messages
 API `system` value and sends text/images as user content blocks. Claude Opus
 4.7 effort variants are sent as Anthropic `output_config.effort` with
 adaptive thinking enabled. Provider key lookup checks the provider's
-environment variable names in `~/.zshrc` first, then falls back to the
-Keychain-saved key.
+environment variable names in shell profiles and the inherited process
+environment. It does not store or read keys from Mac Keychain.

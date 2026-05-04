@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BCCD6C772FA84BF500588377 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = BCCD6C762FA84BF500588377 /* Highlightr */; };
 		WBBLD000000000000000001 /* WritingBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000001 /* WritingBuddyApp.swift */; };
 		WBBLD000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000002 /* AppState.swift */; };
 		WBBLD000000000000000003 /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000003 /* Palette.swift */; };
@@ -34,8 +35,8 @@
 		WBBLD000000000000000025 /* Spinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000025 /* Spinner.swift */; };
 		WBBLD000000000000000026 /* TrafficLightsArea.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000026 /* TrafficLightsArea.swift */; };
 		WBBLD000000000000000027 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000027 /* Assets.xcassets */; };
-		WBBLD000000000000000029 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000029 /* KeychainStore.swift */; };
-		WBBLD000000000000000030 /* AddAPIKeySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000030 /* AddAPIKeySheet.swift */; };
+		WBBLD000000000000000029 /* APIKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000029 /* APIKeyStore.swift */; };
+		WBBLD000000000000000030 /* APIKeySetupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000030 /* APIKeySetupSheet.swift */; };
 		WBBLD000000000000000031 /* OpenAIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000031 /* OpenAIService.swift */; };
 		WBBLD000000000000000032 /* RenderMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000032 /* RenderMode.swift */; };
 		WBBLD000000000000000033 /* OutputBlock+Markdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000033 /* OutputBlock+Markdown.swift */; };
@@ -75,8 +76,8 @@
 		WBFILE00000000000000026 /* TrafficLightsArea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficLightsArea.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000027 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		WBFILE00000000000000028 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		WBFILE00000000000000029 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
-		WBFILE00000000000000030 /* AddAPIKeySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAPIKeySheet.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000029 /* APIKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyStore.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000030 /* APIKeySetupSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeySetupSheet.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000031 /* OpenAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIService.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000032 /* RenderMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderMode.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000033 /* OutputBlock+Markdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OutputBlock+Markdown.swift"; sourceTree = "<group>"; };
@@ -93,6 +94,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BCCD6C772FA84BF500588377 /* Highlightr in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -149,7 +151,7 @@
 				WBFILE00000000000000009 /* AIModel.swift */,
 				WBFILE00000000000000010 /* MockGenerator.swift */,
 				WBFILE00000000000000011 /* DiffEngine.swift */,
-				WBFILE00000000000000029 /* KeychainStore.swift */,
+				WBFILE00000000000000029 /* APIKeyStore.swift */,
 				WBFILE00000000000000031 /* OpenAIService.swift */,
 				WBFILE00000000000000032 /* RenderMode.swift */,
 				WBFILE00000000000000035 /* GlobalSelectionShortcut.swift */,
@@ -184,7 +186,7 @@
 				WBFILE00000000000000024 /* Kbd.swift */,
 				WBFILE00000000000000025 /* Spinner.swift */,
 				WBFILE00000000000000026 /* TrafficLightsArea.swift */,
-				WBFILE00000000000000030 /* AddAPIKeySheet.swift */,
+				WBFILE00000000000000030 /* APIKeySetupSheet.swift */,
 				WBFILE00000000000000034 /* SegmentedToggle.swift */,
 				WBFILE00000000000000036 /* CustomInstructionsSheet.swift */,
 				WBFILE00000000000000038 /* ImageLightbox.swift */,
@@ -236,6 +238,9 @@
 				Base,
 			);
 			mainGroup = WBGROUP00000000000000001;
+			packageReferences = (
+				BCCD6C752FA84BF500588377 /* XCRemoteSwiftPackageReference "Highlightr" */,
+			);
 			productRefGroup = WBGROUP00000000000000002 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -288,8 +293,8 @@
 				WBBLD000000000000000024 /* Kbd.swift in Sources */,
 				WBBLD000000000000000025 /* Spinner.swift in Sources */,
 				WBBLD000000000000000026 /* TrafficLightsArea.swift in Sources */,
-				WBBLD000000000000000029 /* KeychainStore.swift in Sources */,
-				WBBLD000000000000000030 /* AddAPIKeySheet.swift in Sources */,
+				WBBLD000000000000000029 /* APIKeyStore.swift in Sources */,
+				WBBLD000000000000000030 /* APIKeySetupSheet.swift in Sources */,
 				WBBLD000000000000000032 /* RenderMode.swift in Sources */,
 				WBBLD000000000000000033 /* OutputBlock+Markdown.swift in Sources */,
 				WBBLD000000000000000034 /* SegmentedToggle.swift in Sources */,
@@ -493,6 +498,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BCCD6C752FA84BF500588377 /* XCRemoteSwiftPackageReference "Highlightr" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/raspu/Highlightr";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BCCD6C762FA84BF500588377 /* Highlightr */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BCCD6C752FA84BF500588377 /* XCRemoteSwiftPackageReference "Highlightr" */;
+			productName = Highlightr;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = WBPROJECT00000000000000001 /* Project object */;
 }

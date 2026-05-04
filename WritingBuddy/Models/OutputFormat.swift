@@ -35,7 +35,14 @@ enum OutputFormat: String, CaseIterable, Identifiable, Hashable, Codable {
     }
 
     static func guidance(for formats: Set<OutputFormat>) -> String {
-        let selected = requestedFormats(in: formats)
+        guard !formats.isEmpty else {
+            return """
+            Output format: choose whichever shape best fits the content \u{2014} paragraphs, a Markdown bullet list using '-' bullets, a compact Markdown table, or a mix. Pick what makes the result clearest for the reader.
+            Return Markdown only, with no code fence, preamble, or explanation.
+            """
+        }
+
+        let selected = allCases.filter { formats.contains($0) }
         let names = selected.map(\.label).joined(separator: ", ")
         let guidance = selected
             .map(\.guidance)
@@ -48,10 +55,5 @@ enum OutputFormat: String, CaseIterable, Identifiable, Hashable, Codable {
         Use only the requested formats. If multiple formats are requested, return a mix that includes each requested format in this order: Paragraphs, Bullets, Tables.
         \(guidance)
         """
-    }
-
-    private static func requestedFormats(in formats: Set<OutputFormat>) -> [OutputFormat] {
-        let selected = allCases.filter { formats.contains($0) }
-        return selected.isEmpty ? [.paragraphs] : selected
     }
 }

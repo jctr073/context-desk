@@ -58,7 +58,7 @@ private struct ModelPickerMenu: View {
 
             Divider()
 
-            Text("API keys are checked in ~/.zshrc first, then Mac Keychain.")
+            Text("API keys are checked in shell profiles and inherited environment.")
                 .font(.system(size: 11))
                 .foregroundColor(palette.muted)
                 .padding(.horizontal, 14)
@@ -121,7 +121,7 @@ private struct ModelPickerMenu: View {
                     .font(.system(size: 12))
                     .foregroundColor(palette.text)
                     .frame(width: 16)
-                Text("\(hasKey ? "Replace" : "Add") \(provider.keyLabel) API key…")
+                Text("\(hasKey ? "View" : "Set up") \(provider.keyLabel) API key...")
                     .font(.system(size: 13))
                     .foregroundColor(palette.text)
                 Spacer()

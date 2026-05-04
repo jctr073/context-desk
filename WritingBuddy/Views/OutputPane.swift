@@ -8,6 +8,7 @@ struct OutputPane: View {
         VStack(spacing: 0) {
             toolbar
             content
+            footer
         }
         .background(palette.panel)
     }
@@ -18,6 +19,14 @@ struct OutputPane: View {
         HStack(spacing: 6) {
             SectionLabel(text: "Output", palette: palette)
             Spacer()
+
+            Chip(label: "Automatic",
+                 systemImage: "sparkles",
+                 kbd: nil,
+                 isActive: state.isAutomaticFormat,
+                 palette: palette) {
+                state.setAutomaticFormat()
+            }
 
             ForEach(OutputFormat.allCases) { fmt in
                 Chip(label: fmt.label,
@@ -94,5 +103,24 @@ struct OutputPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            Text("\(state.outputWordCount) word\(state.outputWordCount == 1 ? "" : "s")")
+                .font(.system(size: 11))
+                .foregroundColor(palette.muted)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(height: 44)
+        .frame(maxWidth: .infinity)
+        .background(palette.panel)
+        .overlay(alignment: .top) {
+            Rectangle().fill(palette.border).frame(height: 1)
+        }
     }
 }

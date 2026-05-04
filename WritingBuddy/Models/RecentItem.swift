@@ -32,7 +32,7 @@ struct RecentItem: Identifiable, Hashable, Codable {
         self.contextImages = contextImages
         self.output = output
         self.operation = operation
-        self.formats = formats.isEmpty ? [.paragraphs] : formats
+        self.formats = formats
         self.modelID = modelID
     }
 
@@ -46,8 +46,7 @@ struct RecentItem: Identifiable, Hashable, Codable {
         self.contextImages = (try? c.decode([AttachedImage].self, forKey: .contextImages)) ?? []
         self.output = try c.decode([OutputBlock].self, forKey: .output)
         self.operation = try c.decode(WritingOp.self, forKey: .operation)
-        let fmts = try c.decode(Set<OutputFormat>.self, forKey: .formats)
-        self.formats = fmts.isEmpty ? [.paragraphs] : fmts
+        self.formats = try c.decode(Set<OutputFormat>.self, forKey: .formats)
         self.modelID = try c.decode(String.self, forKey: .modelID)
     }
 

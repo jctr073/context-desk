@@ -22,7 +22,7 @@ final class AppState: ObservableObject {
     @Published var inputTab: InputTab = .input
     @Published var editingInstructions: Bool = false
     @Published var ops: Set<WritingOp> = [.cleanup]
-    @Published var fmts: Set<OutputFormat> = [.paragraphs]
+    @Published var fmts: Set<OutputFormat> = []
     @Published var output: [OutputBlock]? = nil
     @Published var running: Bool = false
     @Published var diffMode: Bool = false
@@ -133,6 +133,14 @@ final class AppState: ObservableObject {
         return trimmed.split { $0.isWhitespace }.count
     }
 
+    var outputWordCount: Int {
+        guard let blocks = output else { return 0 }
+        let trimmed = MockGenerator.plainText(from: blocks)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+        return trimmed.split { $0.isWhitespace }.count
+    }
+
     var hasCustomInstructions: Bool {
         !customInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -145,9 +153,14 @@ final class AppState: ObservableObject {
         historyVisible.toggle()
     }
 
+    var isAutomaticFormat: Bool { fmts.isEmpty }
+
+    func setAutomaticFormat() {
+        fmts.removeAll()
+    }
+
     func toggleFormat(_ fmt: OutputFormat) {
         if fmts.contains(fmt) {
-            guard fmts.count > 1 else { return }
             fmts.remove(fmt)
         } else {
             fmts.insert(fmt)
@@ -329,7 +342,7 @@ final class AppState: ObservableObject {
         inputTab = .input
         output = item.output
         ops = [item.operation]
-        fmts = item.formats.isEmpty ? [.paragraphs] : item.formats
+        fmts = item.formats
         if let restoredModel = AIModel.model(withID: item.modelID) {
             model = restoredModel
         }

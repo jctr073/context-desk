@@ -63,19 +63,6 @@ final class AppState: ObservableObject {
         addingKeyFor = nil
     }
 
-    func saveAPIKey(_ key: String) {
-        guard let provider = addingKeyFor else { return }
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        do {
-            try KeychainStore.save(trimmed, for: provider)
-            configuredProviders.insert(provider)
-            addingKeyFor = nil
-        } catch {
-            print("Keychain save failed for \(provider.rawValue):", error)
-        }
-    }
-
     var canRun: Bool {
         let hasInputText = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasInputImages = !inputImages.isEmpty

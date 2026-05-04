@@ -1,43 +1,53 @@
 import SwiftUI
 import AppKit
 
-struct AddAPIKeySheet: View {
+struct APIKeySetupSheet: View {
     @ObservedObject var state: AppState
     let provider: AIProvider
     let palette: Palette
 
-    @State private var key: String = ""
-    @State private var revealed: Bool = false
-    @FocusState private var inputFocused: Bool
-
-    private var trimmedKey: String {
-        key.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var helpText: String {
-        "WritingBuddy checks \(provider.shellAPIKeyLabel) in ~/.zshrc first. Saving here stores a fallback in Mac Keychain and only sends it to \(provider.apiHost)."
+    private var profileList: String {
+        APIKeyStore.profileFileLabels.joined(separator: ", ")
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Add \(provider.keyLabel) API key")
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("\(provider.keyLabel) API key not found")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(palette.text)
-                Text(helpText)
+                Text("WritingBuddy looks for \(provider.shellAPIKeyLabel) in your shell profiles and inherited environment, then sends it only to \(provider.apiHost).")
                     .font(.system(size: 12))
                     .foregroundColor(palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("API KEY")
+                Text("ADD TO PROFILE")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(palette.muted)
                     .kerning(0.4)
 
-                inputRow
+                Text(provider.shellAPIKeyExample)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(palette.text)
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 9)
+                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(palette.surfaceInset)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(palette.border, lineWidth: 1)
+                    )
             }
+
+            Text("Profiles checked: \(profileList). Try again after updating your profile.")
+                .font(.system(size: 12))
+                .foregroundColor(palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 0) {
                 Text("Don't have one? ")
@@ -58,13 +68,13 @@ struct AddAPIKeySheet: View {
 
             HStack(spacing: 8) {
                 Spacer()
-                cancelButton
-                saveButton
+                copyButton
+                doneButton
             }
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
         .padding(20)
-        .frame(width: 420)
+        .frame(width: 440)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(palette.panel)
@@ -74,54 +84,12 @@ struct AddAPIKeySheet: View {
                 .stroke(palette.border, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.30), radius: 30, y: 12)
-        .onAppear { inputFocused = true }
-        .onSubmit { submit() }
     }
 
     @ViewBuilder
-    private var inputRow: some View {
-        HStack(spacing: 6) {
-            Group {
-                if revealed {
-                    TextField(provider.keyPlaceholder, text: $key)
-                } else {
-                    SecureField(provider.keyPlaceholder, text: $key)
-                }
-            }
-            .textFieldStyle(.plain)
-            .font(.system(size: 13, design: .monospaced))
-            .foregroundColor(palette.text)
-            .focused($inputFocused)
-            .onSubmit { submit() }
-
-            Button {
-                revealed.toggle()
-            } label: {
-                Image(systemName: revealed ? "eye.slash" : "eye")
-                    .font(.system(size: 13))
-                    .foregroundColor(palette.muted)
-                    .frame(width: 22, height: 22)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(revealed ? "Hide key" : "Show key")
-        }
-        .padding(.horizontal, 8)
-        .frame(height: 30)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(palette.surfaceInset)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(palette.border, lineWidth: 1)
-        )
-    }
-
-    @ViewBuilder
-    private var cancelButton: some View {
-        Button(action: { state.cancelAddingKey() }) {
-            Text("Cancel")
+    private var copyButton: some View {
+        Button(action: copyExample) {
+            Text("Copy Export")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(palette.text)
                 .padding(.horizontal, 14)
@@ -137,13 +105,12 @@ struct AddAPIKeySheet: View {
                 .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
-        .keyboardShortcut(.cancelAction)
     }
 
     @ViewBuilder
-    private var saveButton: some View {
-        Button(action: submit) {
-            Text("Save to Keychain")
+    private var doneButton: some View {
+        Button(action: { state.cancelAddingKey() }) {
+            Text("Done")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 14)
@@ -152,16 +119,14 @@ struct AddAPIKeySheet: View {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(palette.accent)
                 )
-                .opacity(trimmedKey.isEmpty ? 0.5 : 1.0)
                 .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
-        .disabled(trimmedKey.isEmpty)
         .keyboardShortcut(.defaultAction)
     }
 
-    private func submit() {
-        guard !trimmedKey.isEmpty else { return }
-        state.saveAPIKey(key)
+    private func copyExample() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(provider.shellAPIKeyExample, forType: .string)
     }
 }

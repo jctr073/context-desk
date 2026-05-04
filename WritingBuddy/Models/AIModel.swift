@@ -49,6 +49,14 @@ enum AIProvider: String, CaseIterable, Identifiable, Hashable {
         shellAPIKeyNames.joined(separator: " or ")
     }
 
+    var primaryShellAPIKeyName: String {
+        shellAPIKeyNames[0]
+    }
+
+    var shellAPIKeyExample: String {
+        "export \(primaryShellAPIKeyName)=\"\(keyPlaceholder)\""
+    }
+
     var getKeyURL: URL {
         switch self {
         case .anthropic: return URL(string: "https://console.anthropic.com/settings/keys")!
@@ -56,8 +64,6 @@ enum AIProvider: String, CaseIterable, Identifiable, Hashable {
         case .google:    return URL(string: "https://aistudio.google.com/app/apikey")!
         }
     }
-
-    var keychainAccount: String { rawValue }
 }
 
 enum ReasoningEffort: String, Codable, Hashable {

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BCCD6C772FA84BF500588377 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = BCCD6C762FA84BF500588377 /* Highlightr */; };
 		WBBLD000000000000000001 /* WritingBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000001 /* WritingBuddyApp.swift */; };
 		WBBLD000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000002 /* AppState.swift */; };
 		WBBLD000000000000000003 /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000003 /* Palette.swift */; };
@@ -93,6 +94,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BCCD6C772FA84BF500588377 /* Highlightr in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,6 +238,9 @@
 				Base,
 			);
 			mainGroup = WBGROUP00000000000000001;
+			packageReferences = (
+				BCCD6C752FA84BF500588377 /* XCRemoteSwiftPackageReference "Highlightr" */,
+			);
 			productRefGroup = WBGROUP00000000000000002 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -493,6 +498,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BCCD6C752FA84BF500588377 /* XCRemoteSwiftPackageReference "Highlightr" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/raspu/Highlightr";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BCCD6C762FA84BF500588377 /* Highlightr */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BCCD6C752FA84BF500588377 /* XCRemoteSwiftPackageReference "Highlightr" */;
+			productName = Highlightr;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = WBPROJECT00000000000000001 /* Project object */;
 }

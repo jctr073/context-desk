@@ -491,6 +491,14 @@ private enum MarkdownOutputParser {
                 continue
             }
 
+            if let fence = parseFence(lines: lines, start: index) {
+                flushParagraph()
+                flushBullets()
+                blocks.append(.codeBlock(language: fence.language, code: fence.code))
+                index = fence.nextIndex
+                continue
+            }
+
             if let table = parseTable(lines: lines, start: index) {
                 flushParagraph()
                 flushBullets()
@@ -523,6 +531,29 @@ private enum MarkdownOutputParser {
         flushBullets()
 
         return blocks
+    }
+
+    private static func parseFence(lines: [String], start: Int) -> (language: String?, code: String, nextIndex: Int)? {
+        let opener = lines[start].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard opener.hasPrefix("```") else { return nil }
+
+        let afterTicks = opener.drop { $0 == "`" }
+        let langRaw = afterTicks.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = langRaw.isEmpty ? nil : langRaw
+
+        var codeLines: [String] = []
+        var index = start + 1
+        while index < lines.count {
+            let trimmed = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("```"), trimmed.allSatisfy({ $0 == "`" }) {
+                return (language, codeLines.joined(separator: "\n"), index + 1)
+            }
+            codeLines.append(lines[index])
+            index += 1
+        }
+
+        // Unclosed fence — return what we captured so content isn't dropped.
+        return (language, codeLines.joined(separator: "\n"), index)
     }
 
     private static func parseHeading(_ line: String) -> String? {

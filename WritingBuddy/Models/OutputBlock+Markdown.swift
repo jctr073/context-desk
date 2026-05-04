@@ -15,6 +15,9 @@ extension OutputBlock {
             let separatorLine = "| " + widths.map { String(repeating: "-", count: max(3, $0)) }.joined(separator: " | ") + " |"
             let bodyLines = rows.map { renderRow($0, widths: widths) }
             return ([headerLine, separatorLine] + bodyLines).joined(separator: "\n")
+        case .codeBlock(let language, let code):
+            let fence = "```" + (language ?? "")
+            return "\(fence)\n\(code)\n```"
         }
     }
 

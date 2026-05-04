@@ -1,4 +1,5 @@
 import SwiftUI
+import Highlightr
 
 struct OutputBody: View {
     let blocks: [OutputBlock]?
@@ -31,7 +32,7 @@ struct OutputBody: View {
     private func renderBlock(_ block: OutputBlock) -> some View {
         switch block {
         case .paragraph(let text):
-            Text(text)
+            Text(attributedMarkdown(text))
                 .font(.system(size: 14))
                 .lineSpacing(14 * 0.55) // approximates line-height 1.55
                 .foregroundColor(palette.text)
@@ -52,7 +53,7 @@ struct OutputBody: View {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text("\u{2022}")
                             .foregroundColor(palette.text)
-                        Text(item)
+                        Text(attributedMarkdown(item))
                             .font(.system(size: 14))
                             .lineSpacing(14 * 0.55)
                             .foregroundColor(palette.text)
@@ -66,7 +67,79 @@ struct OutputBody: View {
             TableBlock(head: head, rows: rows, palette: palette)
                 .padding(.vertical, 4)
                 .padding(.bottom, 12)
+
+        case .codeBlock(let language, let code):
+            CodeBlock(language: language, code: code, palette: palette)
+                .padding(.bottom, 12)
         }
+    }
+
+    private func attributedMarkdown(_ s: String) -> AttributedString {
+        (try? AttributedString(markdown: s, options: .init(
+            interpretedSyntax: .inlineOnlyPreservingWhitespace
+        ))) ?? AttributedString(s)
+    }
+}
+
+private struct CodeBlock: View {
+    let language: String?
+    let code: String
+    let palette: Palette
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let language, !language.isEmpty {
+                HStack {
+                    Text(language.uppercased())
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(0.5)
+                        .foregroundColor(palette.muted)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(palette.surfaceInset)
+                Divider().background(palette.border)
+            }
+
+            ScrollView(.horizontal, showsIndicators: true) {
+                Text(highlighted)
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundColor(palette.text)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.panel)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(palette.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var highlighted: AttributedString {
+        let themeName = colorScheme == .dark ? "atom-one-dark" : "xcode"
+        if let ns = SyntaxHighlighter.highlight(code, language: language, themeName: themeName) {
+            return AttributedString(ns)
+        }
+        return AttributedString(code)
+    }
+}
+
+private enum SyntaxHighlighter {
+    static let shared: Highlightr? = Highlightr()
+
+    static func highlight(_ code: String, language: String?, themeName: String) -> NSAttributedString? {
+        guard let h = shared else { return nil }
+        h.setTheme(to: themeName)
+        h.theme.setCodeFont(NSFont.monospacedSystemFont(ofSize: 13, weight: .regular))
+        let normalized = (language?.isEmpty ?? true) ? nil : language
+        return h.highlight(code, as: normalized, fastRender: true)
     }
 }
 

@@ -8,8 +8,11 @@ struct RecentItem: Identifiable, Hashable, Codable {
     let inputImages: [AttachedImage]
     let contextImages: [AttachedImage]
     let output: [OutputBlock]
-    let operation: WritingOp
+    let operationID: String
+    let operationLabel: String
+    let mode: WritingMode
     let formats: Set<OutputFormat>
+    let containerFormat: OutputContainerFormat
     let modelID: String
 
     init(
@@ -20,8 +23,11 @@ struct RecentItem: Identifiable, Hashable, Codable {
         inputImages: [AttachedImage] = [],
         contextImages: [AttachedImage] = [],
         output: [OutputBlock],
-        operation: WritingOp,
+        operationID: String,
+        operationLabel: String,
+        mode: WritingMode = .writing,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat = .markdown,
         modelID: String
     ) {
         self.id = id
@@ -31,8 +37,11 @@ struct RecentItem: Identifiable, Hashable, Codable {
         self.inputImages = inputImages
         self.contextImages = contextImages
         self.output = output
-        self.operation = operation
+        self.operationID = operationID
+        self.operationLabel = operationLabel
+        self.mode = mode
         self.formats = formats
+        self.containerFormat = containerFormat
         self.modelID = modelID
     }
 
@@ -45,14 +54,46 @@ struct RecentItem: Identifiable, Hashable, Codable {
         self.inputImages = (try? c.decode([AttachedImage].self, forKey: .inputImages)) ?? []
         self.contextImages = (try? c.decode([AttachedImage].self, forKey: .contextImages)) ?? []
         self.output = try c.decode([OutputBlock].self, forKey: .output)
-        self.operation = try c.decode(WritingOp.self, forKey: .operation)
+        // New schema: operationID + operationLabel + mode.
+        // Legacy schema: operation: WritingOp.
+        if let opID = try? c.decode(String.self, forKey: .operationID) {
+            self.operationID = opID
+            self.operationLabel = (try? c.decode(String.self, forKey: .operationLabel))
+                ?? (WritingOp(rawValue: opID)?.label
+                    ?? ChatOp(rawValue: opID)?.label
+                    ?? opID.capitalized)
+            self.mode = (try? c.decode(WritingMode.self, forKey: .mode)) ?? .writing
+        } else {
+            let legacyOp = try c.decode(WritingOp.self, forKey: .operation)
+            self.operationID = legacyOp.id
+            self.operationLabel = legacyOp.label
+            self.mode = .writing
+        }
         self.formats = try c.decode(Set<OutputFormat>.self, forKey: .formats)
+        self.containerFormat = (try? c.decode(OutputContainerFormat.self, forKey: .containerFormat)) ?? .markdown
         self.modelID = try c.decode(String.self, forKey: .modelID)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(input, forKey: .input)
+        try c.encode(context, forKey: .context)
+        try c.encode(inputImages, forKey: .inputImages)
+        try c.encode(contextImages, forKey: .contextImages)
+        try c.encode(output, forKey: .output)
+        try c.encode(operationID, forKey: .operationID)
+        try c.encode(operationLabel, forKey: .operationLabel)
+        try c.encode(mode, forKey: .mode)
+        try c.encode(formats, forKey: .formats)
+        try c.encode(containerFormat, forKey: .containerFormat)
+        try c.encode(modelID, forKey: .modelID)
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, input, context, inputImages, contextImages
-        case output, operation, formats, modelID
+        case output, operation, operationID, operationLabel, mode, formats, containerFormat, modelID
     }
 
     var title: String {
@@ -119,7 +160,13 @@ struct RecentItem: Identifiable, Hashable, Codable {
         let selectedFormats = OutputFormat.allCases
             .filter { formats.contains($0) }
             .map(\.label)
-        return [operation.label] + selectedFormats
+        let formatLabel = containerFormat == .markdown ? [] : [containerFormat.label]
+        return [operationLabel] + formatLabel + selectedFormats
+    }
+
+    /// Resolve the stored operation back into an `Operation` if possible.
+    var operation: Operation? {
+        OperationCatalog.operation(for: mode, id: operationID)
     }
 
     private static let dateFormatter: DateFormatter = {

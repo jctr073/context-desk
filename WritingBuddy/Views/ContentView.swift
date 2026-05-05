@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var state = AppState()
+    @State private var splitFraction: Double = 0.5
 
     var body: some View {
         let palette = Palette.native(for: state.theme)
@@ -95,33 +96,68 @@ struct ContentView: View {
 
     @ViewBuilder
     private func mainPanes(palette: Palette) -> some View {
-        if state.layout == .stacked {
-            VStack(spacing: 0) {
-                InputPane(state: state, palette: palette)
-                Rectangle().fill(palette.border).frame(height: 1)
-                OutputPane(state: state, palette: palette)
-            }
-        } else {
-            HStack(spacing: 0) {
-                InputPane(state: state, palette: palette)
-                Rectangle().fill(palette.border).frame(width: 1)
-                OutputPane(state: state, palette: palette)
+        GeometryReader { geo in
+            let isStacked = state.layout == .stacked
+            let total = isStacked ? geo.size.height : geo.size.width
+            let minPx: CGFloat = 120
+            let clamped = max(minPx, min(max(minPx, total - minPx), CGFloat(splitFraction) * total))
+            let inputSize = total > 0 ? clamped : 0
+
+            if isStacked {
+                VStack(spacing: 0) {
+                    InputPane(state: state, palette: palette)
+                        .frame(height: inputSize)
+                    DraggableDivider(
+                        isStacked: true,
+                        totalSize: total,
+                        fraction: $splitFraction,
+                        palette: palette
+                    )
+                    OutputPane(state: state, palette: palette)
+                        .frame(maxHeight: .infinity)
+                }
+                .coordinateSpace(name: "panes")
+            } else {
+                HStack(spacing: 0) {
+                    InputPane(state: state, palette: palette)
+                        .frame(width: inputSize)
+                    DraggableDivider(
+                        isStacked: false,
+                        totalSize: total,
+                        fraction: $splitFraction,
+                        palette: palette
+                    )
+                    OutputPane(state: state, palette: palette)
+                        .frame(maxWidth: .infinity)
+                }
+                .coordinateSpace(name: "panes")
             }
         }
     }
 }
 
-/// Invisible buttons that bind ⌘1-⌘4 to operation selection.
+/// Invisible buttons that bind ⌘1-⌘5 to the active mode's operations.
 private struct KeyboardShortcuts: View {
     @ObservedObject var state: AppState
     var body: some View {
         ZStack {
-            ForEach(WritingOp.allCases) { op in
-                Button("") { state.toggleOp(op) }
-                    .keyboardShortcut(KeyEquivalent(Character(op.keyEquivalent)),
-                                      modifiers: .command)
-                    .opacity(0)
-                    .frame(width: 0, height: 0)
+            switch state.mode {
+            case .writing:
+                ForEach(WritingOp.allCases) { op in
+                    Button("") { state.toggleOp(op) }
+                        .keyboardShortcut(KeyEquivalent(Character(op.keyEquivalent)),
+                                          modifiers: .command)
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                }
+            case .chat:
+                ForEach(ChatOp.allCases) { op in
+                    Button("") { state.setChatOp(op) }
+                        .keyboardShortcut(KeyEquivalent(Character(op.keyEquivalent)),
+                                          modifiers: .command)
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                }
             }
         }
     }

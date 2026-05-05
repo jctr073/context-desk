@@ -22,7 +22,10 @@ final class AppState: ObservableObject {
     @Published var inputTab: InputTab = .input
     @Published var editingInstructions: Bool = false
     @Published var ops: Set<WritingOp> = [.cleanup]
+    @Published var chatOp: ChatOp = .ask
+    @Published var mode: WritingMode = .writing
     @Published var fmts: Set<OutputFormat> = []
+    @Published var containerFormat: OutputContainerFormat = .markdown
     @Published var output: [OutputBlock]? = nil
     @Published var running: Bool = false
     @Published var diffMode: Bool = false
@@ -67,8 +70,9 @@ final class AppState: ObservableObject {
         let hasInputText = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasInputImages = !inputImages.isEmpty
         let canUseImageOnlyInput = AIWritingService.supports(model.provider)
+        let hasOperation = mode == .chat || !(ops.isEmpty && fmts.isEmpty)
         return (hasInputText || (hasInputImages && canUseImageOnlyInput))
-            && !(ops.isEmpty && fmts.isEmpty)
+            && hasOperation
             && !running
     }
 
@@ -149,6 +153,25 @@ final class AppState: ObservableObject {
         ops = [op]
     }
 
+    func setChatOp(_ op: ChatOp) {
+        chatOp = op
+    }
+
+    func setMode(_ newMode: WritingMode) {
+        guard mode != newMode else { return }
+        mode = newMode
+    }
+
+    /// The currently selected operation for the active mode.
+    var activeOperation: Operation {
+        switch mode {
+        case .writing:
+            return WritingOp.allCases.first { ops.contains($0) } ?? .cleanup
+        case .chat:
+            return chatOp
+        }
+    }
+
     func toggleHistoryVisible() {
         historyVisible.toggle()
     }
@@ -175,10 +198,11 @@ final class AppState: ObservableObject {
         let snapshotInstructions = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
         let snapshotInputImages = inputImages
         let snapshotContextImages = contextImages
-        let snapshotOps = ops
+        let snapshotMode = mode
         let snapshotFmts = fmts
+        let snapshotContainerFormat = containerFormat
         let snapshotModel = model
-        let snapshotOp = WritingOp.allCases.first { snapshotOps.contains($0) } ?? .cleanup
+        let snapshotOp: Operation = activeOperation
 
         if AIWritingService.supports(snapshotModel.provider) {
             let provider = snapshotModel.provider
@@ -195,7 +219,9 @@ final class AppState: ObservableObject {
                 inputImages: snapshotInputImages,
                 contextImages: snapshotContextImages,
                 operation: snapshotOp,
+                mode: snapshotMode,
                 formats: snapshotFmts,
+                containerFormat: snapshotContainerFormat,
                 model: snapshotModel,
                 apiKey: apiKey
             )
@@ -209,8 +235,10 @@ final class AppState: ObservableObject {
             guard !Task.isCancelled, let self else { return }
             let result = MockGenerator.generate(
                 input: snapshotInput,
-                ops: snapshotOps,
+                operation: snapshotOp,
+                mode: snapshotMode,
                 fmts: snapshotFmts,
+                containerFormat: snapshotContainerFormat,
                 model: snapshotModel
             )
             await MainActor.run {
@@ -220,7 +248,9 @@ final class AppState: ObservableObject {
                     inputImages: snapshotInputImages,
                     contextImages: snapshotContextImages,
                     operation: snapshotOp,
+                    mode: snapshotMode,
                     formats: snapshotFmts,
+                    containerFormat: snapshotContainerFormat,
                     model: snapshotModel,
                     output: result
                 )
@@ -238,8 +268,10 @@ final class AppState: ObservableObject {
         customInstructions: String,
         inputImages: [AttachedImage],
         contextImages: [AttachedImage],
-        operation: WritingOp,
+        operation: Operation,
+        mode: WritingMode,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat,
         model: AIModel,
         apiKey: String
     ) {
@@ -255,6 +287,7 @@ final class AppState: ObservableObject {
                     contextImages: contextImages,
                     operation: operation,
                     formats: formats,
+                    containerFormat: containerFormat,
                     model: model,
                     apiKey: apiKey
                 )
@@ -266,7 +299,9 @@ final class AppState: ObservableObject {
                         inputImages: inputImages,
                         contextImages: contextImages,
                         operation: operation,
+                        mode: mode,
                         formats: formats,
+                        containerFormat: containerFormat,
                         model: model,
                         output: blocks
                     )
@@ -286,8 +321,10 @@ final class AppState: ObservableObject {
         context: String,
         inputImages: [AttachedImage],
         contextImages: [AttachedImage],
-        operation: WritingOp,
+        operation: Operation,
+        mode: WritingMode,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat,
         model: AIModel,
         output blocks: [OutputBlock]
     ) {
@@ -300,7 +337,9 @@ final class AppState: ObservableObject {
             contextImages: contextImages,
             output: blocks,
             operation: operation,
+            mode: mode,
             formats: formats,
+            containerFormat: containerFormat,
             model: model
         )
     }
@@ -311,8 +350,10 @@ final class AppState: ObservableObject {
         inputImages: [AttachedImage],
         contextImages: [AttachedImage],
         output: [OutputBlock],
-        operation: WritingOp,
+        operation: Operation,
+        mode: WritingMode,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat,
         model: AIModel
     ) {
         let item = RecentItem(
@@ -321,8 +362,11 @@ final class AppState: ObservableObject {
             inputImages: inputImages,
             contextImages: contextImages,
             output: output,
-            operation: operation,
+            operationID: operation.id,
+            operationLabel: operation.label,
+            mode: mode,
             formats: formats,
+            containerFormat: containerFormat,
             modelID: model.id
         )
         history.removeAll { $0.id == item.id }
@@ -341,8 +385,19 @@ final class AppState: ObservableObject {
         contextImages = item.contextImages
         inputTab = .input
         output = item.output
-        ops = [item.operation]
+        mode = item.mode
+        switch item.mode {
+        case .writing:
+            if let op = WritingOp(rawValue: item.operationID) {
+                ops = [op]
+            } else {
+                ops = [.cleanup]
+            }
+        case .chat:
+            chatOp = ChatOp(rawValue: item.operationID) ?? .ask
+        }
         fmts = item.formats
+        containerFormat = item.containerFormat
         if let restoredModel = AIModel.model(withID: item.modelID) {
             model = restoredModel
         }
@@ -425,7 +480,7 @@ final class AppState: ObservableObject {
     func copyOutput() {
         guard let blocks = output else { return }
         let text = renderMode == .raw
-            ? blocks.markdown
+            ? blocks.text(for: containerFormat)
             : MockGenerator.plainText(from: blocks)
         let pb = NSPasteboard.general
         pb.clearContents()

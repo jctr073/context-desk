@@ -78,17 +78,30 @@ struct InputPane: View {
                 .frame(width: 1, height: 20)
                 .padding(.horizontal, 2)
 
-            Spacer()
-
-            ForEach(WritingOp.allCases) { op in
-                Chip(label: op.label,
-                     systemImage: op.sfSymbol,
-                     kbd: op.kbdHint,
-                     isActive: state.ops.contains(op),
-                     palette: palette) {
-                    state.toggleOp(op)
-                }
+            ModePill(mode: state.mode, palette: palette) { newMode in
+                state.setMode(newMode)
             }
+
+            Rectangle()
+                .fill(palette.border)
+                .frame(width: 1, height: 20)
+                .padding(.horizontal, 2)
+
+            Spacer(minLength: 8)
+
+            Text("Action")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(palette.muted)
+                .padding(.trailing, 2)
+
+            ActionDropdown(
+                mode: state.mode,
+                writingOp: state.ops.first ?? .cleanup,
+                chatOp: state.chatOp,
+                palette: palette,
+                onSelectWritingOp: { state.toggleOp($0) },
+                onSelectChatOp: { state.setChatOp($0) }
+            )
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

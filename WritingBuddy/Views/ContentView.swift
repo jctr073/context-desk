@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var state = AppState()
+    @State private var splitFraction: Double = 0.5
 
     var body: some View {
         let palette = Palette.native(for: state.theme)
@@ -95,17 +96,41 @@ struct ContentView: View {
 
     @ViewBuilder
     private func mainPanes(palette: Palette) -> some View {
-        if state.layout == .stacked {
-            VStack(spacing: 0) {
-                InputPane(state: state, palette: palette)
-                Rectangle().fill(palette.border).frame(height: 1)
-                OutputPane(state: state, palette: palette)
-            }
-        } else {
-            HStack(spacing: 0) {
-                InputPane(state: state, palette: palette)
-                Rectangle().fill(palette.border).frame(width: 1)
-                OutputPane(state: state, palette: palette)
+        GeometryReader { geo in
+            let isStacked = state.layout == .stacked
+            let total = isStacked ? geo.size.height : geo.size.width
+            let minPx: CGFloat = 120
+            let clamped = max(minPx, min(max(minPx, total - minPx), CGFloat(splitFraction) * total))
+            let inputSize = total > 0 ? clamped : 0
+
+            if isStacked {
+                VStack(spacing: 0) {
+                    InputPane(state: state, palette: palette)
+                        .frame(height: inputSize)
+                    DraggableDivider(
+                        isStacked: true,
+                        totalSize: total,
+                        fraction: $splitFraction,
+                        palette: palette
+                    )
+                    OutputPane(state: state, palette: palette)
+                        .frame(maxHeight: .infinity)
+                }
+                .coordinateSpace(name: "panes")
+            } else {
+                HStack(spacing: 0) {
+                    InputPane(state: state, palette: palette)
+                        .frame(width: inputSize)
+                    DraggableDivider(
+                        isStacked: false,
+                        totalSize: total,
+                        fraction: $splitFraction,
+                        palette: palette
+                    )
+                    OutputPane(state: state, palette: palette)
+                        .frame(maxWidth: .infinity)
+                }
+                .coordinateSpace(name: "panes")
             }
         }
     }

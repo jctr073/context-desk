@@ -48,31 +48,32 @@ struct ActionDropdown: View {
                 }
             }
         } label: {
-            HStack(spacing: 7) {
-                Image(systemName: current.sfSymbol)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(current.label)
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .semibold))
+                Text(current.label)
+                    .font(.system(size: 13, weight: .bold))
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-                    .opacity(0.75)
+                    .font(.system(size: 10, weight: .bold))
+                    .opacity(0.8)
                     .padding(.leading, 1)
             }
             .foregroundColor(.white)
-            .padding(.horizontal, 11)
-            .frame(height: 28)
+            .padding(.horizontal, 14)
+            .frame(height: 32)
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(palette.accent)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
             )
-            .shadow(color: Color.black.opacity(0.05), radius: 0, y: 1)
-            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .shadow(color: palette.accent.opacity(0.25), radius: 4, y: 1)
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .help(mode == .writing ? "Choose a writing action" : "Choose a chat action")

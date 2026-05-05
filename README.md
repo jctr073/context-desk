@@ -18,7 +18,7 @@ uses deterministic mock output for now.
   levels, Claude Sonnet 4.6, Claude Haiku 4.5, and a Gemini 2.5 Pro placeholder.
 - Single operation selector with keyboard shortcuts (⌘1 – ⌘4).
 - Automatic output mode plus optional multi-select format chips (Paragraphs,
-  Bullets, Tables).
+  Bullets, Tables), with Markdown and Slack mrkdwn container options.
 - Session-scoped custom instructions that are applied alongside the selected
   operation.
 - Input and context image attachments via picker, paste, or drag and drop.
@@ -141,6 +141,7 @@ WritingBuddy/
   Models/
     Operation.swift         — Rephrase / Expand / Shorten / Clean up
     OutputFormat.swift      — Automatic guidance + Paragraphs / Bullets / Tables
+    OutputContainerFormat.swift — Markdown / Slack output container guidance
     OutputBlock.swift       — paragraph | heading | bulletList | table | codeBlock
     OutputBlock+Markdown.swift — Markdown export for rendered output blocks
     RenderMode.swift        — Rendered vs Raw output toggle
@@ -177,10 +178,10 @@ WritingBuddy/
 
 ## Model routing
 
-Live models call `AIWritingService.submit(input:context:customInstructions:inputImages:contextImages:operation:formats:model:apiKey:)`.
+Live models call `AIWritingService.submit(input:context:customInstructions:inputImages:contextImages:operation:formats:containerFormat:model:apiKey:)`.
 The UI passes one provider-neutral request: input text, reference context,
 custom instructions, input/context images, the selected operation, selected
-output formats, and model.
+output formats, selected output container, and model.
 `AIWritingService` then maps that request to the selected provider's API:
 OpenAI receives `instructions` plus a text or multimodal `input` through the
 Responses API, including `reasoning.effort` for GPT-5.5 effort variants, while

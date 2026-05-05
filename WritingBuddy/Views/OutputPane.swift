@@ -101,6 +101,7 @@ struct OutputPane: View {
             } else {
                 OutputBody(blocks: state.output,
                            renderMode: state.renderMode,
+                           containerFormat: state.containerFormat,
                            palette: palette)
             }
         }

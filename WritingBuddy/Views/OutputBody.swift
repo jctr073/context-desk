@@ -1,9 +1,11 @@
 import SwiftUI
+import Foundation
 import Highlightr
 
 struct OutputBody: View {
     let blocks: [OutputBlock]?
     let renderMode: RenderMode
+    let containerFormat: OutputContainerFormat
     let palette: Palette
 
     var body: some View {
@@ -21,7 +23,7 @@ struct OutputBody: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             case .raw:
-                RawMarkdownView(text: blocks.markdown, palette: palette)
+                RawTextView(text: blocks.text(for: containerFormat), palette: palette)
             }
         } else {
             EmptyOutputState(palette: palette)
@@ -32,7 +34,7 @@ struct OutputBody: View {
     private func renderBlock(_ block: OutputBlock) -> some View {
         switch block {
         case .paragraph(let text):
-            Text(attributedMarkdown(text))
+            Text(attributedInline(text))
                 .font(.system(size: 14))
                 .lineSpacing(14 * 0.55) // approximates line-height 1.55
                 .foregroundColor(palette.text)
@@ -53,7 +55,7 @@ struct OutputBody: View {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text("\u{2022}")
                             .foregroundColor(palette.text)
-                        Text(attributedMarkdown(item))
+                        Text(attributedInline(item))
                             .font(.system(size: 14))
                             .lineSpacing(14 * 0.55)
                             .foregroundColor(palette.text)
@@ -74,10 +76,36 @@ struct OutputBody: View {
         }
     }
 
+    private func attributedInline(_ s: String) -> AttributedString {
+        switch containerFormat {
+        case .slack:
+            return attributedMarkdown(Self.slackInlineAsMarkdown(s))
+        case .markdown, .plain, .html:
+            return attributedMarkdown(s)
+        }
+    }
+
     private func attributedMarkdown(_ s: String) -> AttributedString {
         (try? AttributedString(markdown: s, options: .init(
             interpretedSyntax: .inlineOnlyPreservingWhitespace
         ))) ?? AttributedString(s)
+    }
+
+    private static func slackInlineAsMarkdown(_ text: String) -> String {
+        var output = text
+        output = replacing(output, pattern: #"<([^|>]+)\|([^>]+)>"#, template: #"[$2]($1)"#)
+        output = replacing(output, pattern: #"(?<!\*)\*([^*\n]+)\*(?!\*)"#, template: #"**$1**"#)
+        output = replacing(output, pattern: #"(?<!_)_([^_\n]+)_(?!_)"#, template: #"*$1*"#)
+        output = replacing(output, pattern: #"(?<!~)~([^~\n]+)~(?!~)"#, template: #"~~$1~~"#)
+        return output
+    }
+
+    private static func replacing(_ text: String, pattern: String, template: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return text
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: template)
     }
 }
 
@@ -191,7 +219,7 @@ private struct TableBlock: View {
     }
 }
 
-private struct RawMarkdownView: View {
+private struct RawTextView: View {
     let text: String
     let palette: Palette
 

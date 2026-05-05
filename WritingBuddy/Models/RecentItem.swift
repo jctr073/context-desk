@@ -12,6 +12,7 @@ struct RecentItem: Identifiable, Hashable, Codable {
     let operationLabel: String
     let mode: WritingMode
     let formats: Set<OutputFormat>
+    let containerFormat: OutputContainerFormat
     let modelID: String
 
     init(
@@ -26,6 +27,7 @@ struct RecentItem: Identifiable, Hashable, Codable {
         operationLabel: String,
         mode: WritingMode = .writing,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat = .markdown,
         modelID: String
     ) {
         self.id = id
@@ -39,6 +41,7 @@ struct RecentItem: Identifiable, Hashable, Codable {
         self.operationLabel = operationLabel
         self.mode = mode
         self.formats = formats
+        self.containerFormat = containerFormat
         self.modelID = modelID
     }
 
@@ -67,6 +70,7 @@ struct RecentItem: Identifiable, Hashable, Codable {
             self.mode = .writing
         }
         self.formats = try c.decode(Set<OutputFormat>.self, forKey: .formats)
+        self.containerFormat = (try? c.decode(OutputContainerFormat.self, forKey: .containerFormat)) ?? .markdown
         self.modelID = try c.decode(String.self, forKey: .modelID)
     }
 
@@ -83,12 +87,13 @@ struct RecentItem: Identifiable, Hashable, Codable {
         try c.encode(operationLabel, forKey: .operationLabel)
         try c.encode(mode, forKey: .mode)
         try c.encode(formats, forKey: .formats)
+        try c.encode(containerFormat, forKey: .containerFormat)
         try c.encode(modelID, forKey: .modelID)
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, input, context, inputImages, contextImages
-        case output, operation, operationID, operationLabel, mode, formats, modelID
+        case output, operation, operationID, operationLabel, mode, formats, containerFormat, modelID
     }
 
     var title: String {
@@ -155,7 +160,8 @@ struct RecentItem: Identifiable, Hashable, Codable {
         let selectedFormats = OutputFormat.allCases
             .filter { formats.contains($0) }
             .map(\.label)
-        return [operationLabel] + selectedFormats
+        let formatLabel = containerFormat == .markdown ? [] : [containerFormat.label]
+        return [operationLabel] + formatLabel + selectedFormats
     }
 
     /// Resolve the stored operation back into an `Operation` if possible.

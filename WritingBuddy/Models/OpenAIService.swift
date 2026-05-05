@@ -38,6 +38,7 @@ enum AIWritingService {
         contextImages: [AttachedImage] = [],
         operation: Operation,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat,
         model: AIModel,
         apiKey: String
     ) async throws -> [OutputBlock] {
@@ -45,6 +46,7 @@ enum AIWritingService {
             model: model,
             operation: operation,
             formats: formats,
+            containerFormat: containerFormat,
             input: input,
             context: context,
             customInstructions: customInstructions,
@@ -141,6 +143,7 @@ private struct SubmitPrompt {
         model: AIModel,
         operation: Operation,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat,
         input: String,
         context: String,
         customInstructions: String,
@@ -154,7 +157,7 @@ private struct SubmitPrompt {
 
         var sections: [String] = [
             operation.instructions,
-            OutputFormat.guidance(for: formats),
+            OutputFormat.guidance(for: formats, containerFormat: containerFormat),
         ]
 
         let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines)

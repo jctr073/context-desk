@@ -7,6 +7,7 @@ enum MockGenerator {
                          operation: Operation,
                          mode: WritingMode = .writing,
                          fmts: Set<OutputFormat>,
+                         containerFormat: OutputContainerFormat = .markdown,
                          model: AIModel) -> [OutputBlock] {
         guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return []
@@ -38,13 +39,13 @@ enum MockGenerator {
 
         var out: [OutputBlock] = []
         if wantParas {
-            out.append(.paragraph(text: body))
+            out.append(.paragraph(text: containerFormat == .slack ? slackifyInline(body) : body))
         }
 
         if wantBullets {
             out.append(.heading(text: "Key points"))
             out.append(.bulletList(items: [
-                "Engineering is largely complete; design is finalizing details.",
+                containerFormat == .slack ? "*Engineering* is largely complete; design is finalizing details." : "Engineering is largely complete; design is finalizing details.",
                 "Closed beta proposed for next week with ~25 customers.",
                 "Beta covers activity feed, filter rail, and saved views.",
                 "Five-day window, then go/no-go on GA.",
@@ -65,6 +66,10 @@ enum MockGenerator {
         }
 
         return out
+    }
+
+    private static func slackifyInline(_ text: String) -> String {
+        text.replacingOccurrences(of: "Dashboard", with: "*Dashboard*")
     }
 
     private static func chatStub(for op: ChatOp, input: String) -> String {

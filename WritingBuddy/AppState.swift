@@ -200,6 +200,7 @@ final class AppState: ObservableObject {
         let snapshotContextImages = contextImages
         let snapshotMode = mode
         let snapshotFmts = fmts
+        let snapshotContainerFormat = containerFormat
         let snapshotModel = model
         let snapshotOp: Operation = activeOperation
 
@@ -220,6 +221,7 @@ final class AppState: ObservableObject {
                 operation: snapshotOp,
                 mode: snapshotMode,
                 formats: snapshotFmts,
+                containerFormat: snapshotContainerFormat,
                 model: snapshotModel,
                 apiKey: apiKey
             )
@@ -236,6 +238,7 @@ final class AppState: ObservableObject {
                 operation: snapshotOp,
                 mode: snapshotMode,
                 fmts: snapshotFmts,
+                containerFormat: snapshotContainerFormat,
                 model: snapshotModel
             )
             await MainActor.run {
@@ -247,6 +250,7 @@ final class AppState: ObservableObject {
                     operation: snapshotOp,
                     mode: snapshotMode,
                     formats: snapshotFmts,
+                    containerFormat: snapshotContainerFormat,
                     model: snapshotModel,
                     output: result
                 )
@@ -267,6 +271,7 @@ final class AppState: ObservableObject {
         operation: Operation,
         mode: WritingMode,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat,
         model: AIModel,
         apiKey: String
     ) {
@@ -282,6 +287,7 @@ final class AppState: ObservableObject {
                     contextImages: contextImages,
                     operation: operation,
                     formats: formats,
+                    containerFormat: containerFormat,
                     model: model,
                     apiKey: apiKey
                 )
@@ -295,6 +301,7 @@ final class AppState: ObservableObject {
                         operation: operation,
                         mode: mode,
                         formats: formats,
+                        containerFormat: containerFormat,
                         model: model,
                         output: blocks
                     )
@@ -317,6 +324,7 @@ final class AppState: ObservableObject {
         operation: Operation,
         mode: WritingMode,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat,
         model: AIModel,
         output blocks: [OutputBlock]
     ) {
@@ -331,6 +339,7 @@ final class AppState: ObservableObject {
             operation: operation,
             mode: mode,
             formats: formats,
+            containerFormat: containerFormat,
             model: model
         )
     }
@@ -344,6 +353,7 @@ final class AppState: ObservableObject {
         operation: Operation,
         mode: WritingMode,
         formats: Set<OutputFormat>,
+        containerFormat: OutputContainerFormat,
         model: AIModel
     ) {
         let item = RecentItem(
@@ -356,6 +366,7 @@ final class AppState: ObservableObject {
             operationLabel: operation.label,
             mode: mode,
             formats: formats,
+            containerFormat: containerFormat,
             modelID: model.id
         )
         history.removeAll { $0.id == item.id }
@@ -386,6 +397,7 @@ final class AppState: ObservableObject {
             chatOp = ChatOp(rawValue: item.operationID) ?? .ask
         }
         fmts = item.formats
+        containerFormat = item.containerFormat
         if let restoredModel = AIModel.model(withID: item.modelID) {
             model = restoredModel
         }
@@ -468,7 +480,7 @@ final class AppState: ObservableObject {
     func copyOutput() {
         guard let blocks = output else { return }
         let text = renderMode == .raw
-            ? blocks.markdown
+            ? blocks.text(for: containerFormat)
             : MockGenerator.plainText(from: blocks)
         let pb = NSPasteboard.general
         pb.clearContents()

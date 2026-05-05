@@ -111,17 +111,28 @@ struct ContentView: View {
     }
 }
 
-/// Invisible buttons that bind ⌘1-⌘4 to operation selection.
+/// Invisible buttons that bind ⌘1-⌘5 to the active mode's operations.
 private struct KeyboardShortcuts: View {
     @ObservedObject var state: AppState
     var body: some View {
         ZStack {
-            ForEach(WritingOp.allCases) { op in
-                Button("") { state.toggleOp(op) }
-                    .keyboardShortcut(KeyEquivalent(Character(op.keyEquivalent)),
-                                      modifiers: .command)
-                    .opacity(0)
-                    .frame(width: 0, height: 0)
+            switch state.mode {
+            case .writing:
+                ForEach(WritingOp.allCases) { op in
+                    Button("") { state.toggleOp(op) }
+                        .keyboardShortcut(KeyEquivalent(Character(op.keyEquivalent)),
+                                          modifiers: .command)
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                }
+            case .chat:
+                ForEach(ChatOp.allCases) { op in
+                    Button("") { state.setChatOp(op) }
+                        .keyboardShortcut(KeyEquivalent(Character(op.keyEquivalent)),
+                                          modifiers: .command)
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                }
             }
         }
     }

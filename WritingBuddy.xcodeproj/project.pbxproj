@@ -45,6 +45,10 @@
 		WBBLD000000000000000036 /* CustomInstructionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000036 /* CustomInstructionsSheet.swift */; };
 		WBBLD000000000000000037 /* AttachedImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000037 /* AttachedImage.swift */; };
 		WBBLD000000000000000038 /* ImageLightbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000038 /* ImageLightbox.swift */; };
+		WBBLD000000000000000039 /* ModePill.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000039 /* ModePill.swift */; };
+		WBBLD000000000000000040 /* ActionDropdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000040 /* ActionDropdown.swift */; };
+		WBBLD000000000000000041 /* OutputContainerFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000041 /* OutputContainerFormat.swift */; };
+		WBBLD000000000000000042 /* FormatDropdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000042 /* FormatDropdown.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -86,6 +90,10 @@
 		WBFILE00000000000000036 /* CustomInstructionsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomInstructionsSheet.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000037 /* AttachedImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachedImage.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000038 /* ImageLightbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLightbox.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000039 /* ModePill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModePill.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000040 /* ActionDropdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionDropdown.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000041 /* OutputContainerFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputContainerFormat.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000042 /* FormatDropdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatDropdown.swift; sourceTree = "<group>"; };
 		WBPRODUCT0000000000000001 /* WritingBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WritingBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -145,6 +153,7 @@
 			children = (
 				WBFILE00000000000000005 /* Operation.swift */,
 				WBFILE00000000000000006 /* OutputFormat.swift */,
+				WBFILE00000000000000041 /* OutputContainerFormat.swift */,
 				WBFILE00000000000000007 /* OutputBlock.swift */,
 				WBFILE00000000000000033 /* OutputBlock+Markdown.swift */,
 				WBFILE00000000000000008 /* RecentItem.swift */,
@@ -190,6 +199,9 @@
 				WBFILE00000000000000034 /* SegmentedToggle.swift */,
 				WBFILE00000000000000036 /* CustomInstructionsSheet.swift */,
 				WBFILE00000000000000038 /* ImageLightbox.swift */,
+				WBFILE00000000000000039 /* ModePill.swift */,
+				WBFILE00000000000000040 /* ActionDropdown.swift */,
+				WBFILE00000000000000042 /* FormatDropdown.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -302,6 +314,10 @@
 				WBBLD000000000000000036 /* CustomInstructionsSheet.swift in Sources */,
 				WBBLD000000000000000037 /* AttachedImage.swift in Sources */,
 				WBBLD000000000000000038 /* ImageLightbox.swift in Sources */,
+				WBBLD000000000000000039 /* ModePill.swift in Sources */,
+				WBBLD000000000000000040 /* ActionDropdown.swift in Sources */,
+				WBBLD000000000000000041 /* OutputContainerFormat.swift in Sources */,
+				WBBLD000000000000000042 /* FormatDropdown.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

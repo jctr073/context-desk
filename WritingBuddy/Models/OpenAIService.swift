@@ -36,7 +36,7 @@ enum AIWritingService {
         customInstructions: String = "",
         inputImages: [AttachedImage] = [],
         contextImages: [AttachedImage] = [],
-        operation: WritingOp,
+        operation: Operation,
         formats: Set<OutputFormat>,
         model: AIModel,
         apiKey: String
@@ -139,7 +139,7 @@ private struct SubmitPrompt {
 
     init(
         model: AIModel,
-        operation: WritingOp,
+        operation: Operation,
         formats: Set<OutputFormat>,
         input: String,
         context: String,

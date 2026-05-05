@@ -43,6 +43,8 @@ struct OutputPane: View {
                 .frame(width: 1, height: 18)
                 .padding(.horizontal, 2)
 
+            FormatDropdown(selection: $state.containerFormat, palette: palette)
+
             SegmentedToggle(
                 options: RenderMode.allCases,
                 label: { $0.label },

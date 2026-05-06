@@ -52,6 +52,9 @@ enum AttachedImageLoader {
         "image/png", "image/jpeg", "image/gif", "image/webp"
     ]
 
+    /// Anthropic recommends ≤1568px long edge; OpenAI tiles at 768px so smaller is also cheaper there.
+    private static let maxLongEdge = 1568
+
     /// Result of attempting to ingest images from a pasteboard or set of URLs.
     struct Outcome {
         var images: [AttachedImage] = []
@@ -92,13 +95,14 @@ enum AttachedImageLoader {
         guard supportedMimeTypes.contains(mime) else { return nil }
         guard let nsImage = NSImage(data: data) else { return nil }
         let (w, h) = pixelSize(of: nsImage)
+        let resolved = downscaleIfNeeded(data: data, mimeType: mime) ?? (data, mime, w, h)
         return AttachedImage(
             fileName: url.lastPathComponent,
-            mimeType: mime,
-            base64: data.base64EncodedString(),
-            width: w,
-            height: h,
-            byteSize: data.count
+            mimeType: resolved.1,
+            base64: resolved.0.base64EncodedString(),
+            width: resolved.2,
+            height: resolved.3,
+            byteSize: resolved.0.count
         )
     }
 
@@ -109,14 +113,77 @@ enum AttachedImageLoader {
         else { return nil }
         let (w, h) = pixelSize(of: nsImage, bitmap: rep)
         let name = suggestedName ?? "Pasted image \(timestampString()).png"
+        let resolved = downscaleIfNeeded(data: pngData, mimeType: "image/png") ?? (pngData, "image/png", w, h)
         return AttachedImage(
             fileName: name,
-            mimeType: "image/png",
-            base64: pngData.base64EncodedString(),
-            width: w,
-            height: h,
-            byteSize: pngData.count
+            mimeType: resolved.1,
+            base64: resolved.0.base64EncodedString(),
+            width: resolved.2,
+            height: resolved.3,
+            byteSize: resolved.0.count
         )
+    }
+
+    /// Resize the image so its long edge is ≤ `maxLongEdge`. Returns nil to mean
+    /// "use the original bytes" — already small enough, animated GIF (would lose
+    /// animation if redrawn), or any decode/encode failure.
+    private static func downscaleIfNeeded(
+        data: Data,
+        mimeType: String
+    ) -> (Data, String, Int, Int)? {
+        if mimeType == "image/gif" { return nil }
+        guard let src = NSBitmapImageRep(data: data) else { return nil }
+        let srcW = src.pixelsWide
+        let srcH = src.pixelsHigh
+        let longEdge = max(srcW, srcH)
+        guard longEdge > maxLongEdge else { return nil }
+
+        let scale = Double(maxLongEdge) / Double(longEdge)
+        let dstW = max(1, Int((Double(srcW) * scale).rounded()))
+        let dstH = max(1, Int((Double(srcH) * scale).rounded()))
+
+        let hasAlpha = src.hasAlpha
+        guard let dst = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: dstW,
+            pixelsHigh: dstH,
+            bitsPerSample: 8,
+            samplesPerPixel: hasAlpha ? 4 : 3,
+            hasAlpha: hasAlpha,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else { return nil }
+        dst.size = NSSize(width: dstW, height: dstH)
+
+        guard let ctx = NSGraphicsContext(bitmapImageRep: dst) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = ctx
+        ctx.imageInterpolation = .high
+        src.draw(
+            in: NSRect(x: 0, y: 0, width: dstW, height: dstH),
+            from: NSRect(x: 0, y: 0, width: srcW, height: srcH),
+            operation: .sourceOver,
+            fraction: 1.0,
+            respectFlipped: false,
+            hints: [.interpolation: NSImageInterpolation.high]
+        )
+        NSGraphicsContext.restoreGraphicsState()
+
+        let outMime: String
+        let outData: Data?
+        switch mimeType {
+        case "image/jpeg":
+            outMime = "image/jpeg"
+            outData = dst.representation(using: .jpeg, properties: [.compressionFactor: 0.9])
+        default:
+            // PNG and WebP both re-encode as PNG (NSBitmapImageRep cannot write WebP).
+            outMime = "image/png"
+            outData = dst.representation(using: .png, properties: [:])
+        }
+        guard let outData else { return nil }
+        return (outData, outMime, dstW, dstH)
     }
 
     private static func mimeType(for url: URL, fallback data: Data) -> String {

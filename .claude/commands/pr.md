@@ -1,9 +1,9 @@
 ---
-description: Open a pull request for the current branch using PR_TEMPLATEL.md
+description: Open a pull request for the current branch using .github/PULL_REQUEST_TEMPLATE.md
 argument-hint: "[optional extra context for the PR description]"
 ---
 
-Open a pull request for the current branch, filling in `PR_TEMPLATEL.md` based on what actually changed.
+Open a pull request for the current branch, filling in `.github/PULL_REQUEST_TEMPLATE.md` based on what actually changed.
 
 Extra context from the user (may be empty): $ARGUMENTS
 
@@ -17,7 +17,7 @@ Run these in parallel:
 - `git log main..HEAD --oneline` for the commit list
 - `git diff main...HEAD --stat` for a file-level summary
 - `git diff main...HEAD` for the full diff
-- Read `/Users/jcarter/src/writing-buddy/PR_TEMPLATEL.md`
+- Read `/Users/jcarter/src/writing-buddy/.github/PULL_REQUEST_TEMPLATE.md`
 
 If the current branch is `main`, stop and tell the user — no PR to open.
 

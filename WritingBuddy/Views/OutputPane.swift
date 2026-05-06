@@ -94,7 +94,7 @@ struct OutputPane: View {
     private var content: some View {
         ZStack {
             palette.surfaceInset
-            if state.running {
+            if state.running && (state.output?.isEmpty ?? true) {
                 StreamingPlaceholder(palette: palette)
             } else if state.diffMode {
                 DiffView(original: state.input, current: state.output, palette: palette)

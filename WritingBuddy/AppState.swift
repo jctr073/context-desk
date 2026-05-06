@@ -279,7 +279,7 @@ final class AppState: ObservableObject {
         output = nil
         runTask = Task { [weak self] in
             do {
-                let blocks = try await AIWritingService.submit(
+                let stream = AIWritingService.submitStream(
                     input: input,
                     context: context,
                     customInstructions: customInstructions,
@@ -289,6 +289,10 @@ final class AppState: ObservableObject {
                     model: model,
                     apiKey: apiKey
                 )
+                for try await snapshot in stream {
+                    if Task.isCancelled { return }
+                    await MainActor.run { self?.output = snapshot }
+                }
                 guard !Task.isCancelled, let self else { return }
                 await MainActor.run {
                     self.finishRun(
@@ -301,7 +305,7 @@ final class AppState: ObservableObject {
                         formats: formats,
                         containerFormat: containerFormat,
                         model: model,
-                        output: blocks
+                        output: self.output ?? []
                     )
                 }
             } catch {

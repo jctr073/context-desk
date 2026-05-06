@@ -55,6 +55,12 @@
 		WBBLD000000000000000051 /* StructuredOutputSchemaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000051 /* StructuredOutputSchemaTests.swift */; };
 		WBBLD000000000000000052 /* OpenAIResponseDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000052 /* OpenAIResponseDecodingTests.swift */; };
 		WBBLD000000000000000053 /* AnthropicResponseDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000053 /* AnthropicResponseDecodingTests.swift */; };
+		WBBLD000000000000000060 /* SSEEventStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000060 /* SSEEventStream.swift */; };
+		WBBLD000000000000000061 /* StreamingOutputParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000061 /* StreamingOutputParser.swift */; };
+		WBBLD000000000000000062 /* SSEEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000062 /* SSEEventStreamTests.swift */; };
+		WBBLD000000000000000063 /* StreamingOutputParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000063 /* StreamingOutputParserTests.swift */; };
+		WBBLD000000000000000064 /* OpenAIStreamDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000064 /* OpenAIStreamDecodingTests.swift */; };
+		WBBLD000000000000000065 /* AnthropicStreamDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */; };
 		WBBLD000000000000000054 /* SubmitPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000054 /* SubmitPromptTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -107,6 +113,12 @@
 		WBFILE00000000000000051 /* StructuredOutputSchemaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredOutputSchemaTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000052 /* OpenAIResponseDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIResponseDecodingTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000053 /* AnthropicResponseDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicResponseDecodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000060 /* SSEEventStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEEventStream.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000061 /* StreamingOutputParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingOutputParser.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000062 /* SSEEventStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEEventStreamTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000063 /* StreamingOutputParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingOutputParserTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000064 /* OpenAIStreamDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIStreamDecodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicStreamDecodingTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000054 /* SubmitPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubmitPromptTests.swift; sourceTree = "<group>"; };
 		WBPRODUCT0000000000000001 /* WritingBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WritingBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WritingBuddyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -148,6 +160,10 @@
 				WBFILE00000000000000052 /* OpenAIResponseDecodingTests.swift */,
 				WBFILE00000000000000053 /* AnthropicResponseDecodingTests.swift */,
 				WBFILE00000000000000054 /* SubmitPromptTests.swift */,
+				WBFILE00000000000000062 /* SSEEventStreamTests.swift */,
+				WBFILE00000000000000063 /* StreamingOutputParserTests.swift */,
+				WBFILE00000000000000064 /* OpenAIStreamDecodingTests.swift */,
+				WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */,
 			);
 			path = WritingBuddyTests;
 			sourceTree = "<group>";
@@ -202,6 +218,8 @@
 				WBFILE00000000000000032 /* RenderMode.swift */,
 				WBFILE00000000000000035 /* GlobalSelectionShortcut.swift */,
 				WBFILE00000000000000037 /* AttachedImage.swift */,
+				WBFILE00000000000000060 /* SSEEventStream.swift */,
+				WBFILE00000000000000061 /* StreamingOutputParser.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -398,6 +416,8 @@
 				WBBLD000000000000000042 /* FormatDropdown.swift in Sources */,
 				WBBLD000000000000000043 /* DraggableDivider.swift in Sources */,
 				WBBLD000000000000000044 /* StructuredOutputSchema.swift in Sources */,
+				WBBLD000000000000000060 /* SSEEventStream.swift in Sources */,
+				WBBLD000000000000000061 /* StreamingOutputParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -410,6 +430,10 @@
 				WBBLD000000000000000052 /* OpenAIResponseDecodingTests.swift in Sources */,
 				WBBLD000000000000000053 /* AnthropicResponseDecodingTests.swift in Sources */,
 				WBBLD000000000000000054 /* SubmitPromptTests.swift in Sources */,
+				WBBLD000000000000000062 /* SSEEventStreamTests.swift in Sources */,
+				WBBLD000000000000000063 /* StreamingOutputParserTests.swift in Sources */,
+				WBBLD000000000000000064 /* OpenAIStreamDecodingTests.swift in Sources */,
+				WBBLD000000000000000065 /* AnthropicStreamDecodingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

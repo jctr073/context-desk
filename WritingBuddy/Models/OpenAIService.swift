@@ -5,6 +5,8 @@ enum AIWritingServiceError: LocalizedError {
     case unsupportedProvider(AIProvider)
     case apiError(String)
     case missingOutput
+    case invalidStructuredOutput(underlying: Error)
+    case emptyBlocks
 
     var errorDescription: String? {
         switch self {
@@ -16,6 +18,10 @@ enum AIWritingServiceError: LocalizedError {
             return message
         case .missingOutput:
             return "The AI provider did not return any improved text."
+        case .invalidStructuredOutput:
+            return "The AI provider returned output we couldn't parse. Try again, or switch models."
+        case .emptyBlocks:
+            return "The AI provider returned an empty response."
         }
     }
 }
@@ -37,16 +43,12 @@ enum AIWritingService {
         inputImages: [AttachedImage] = [],
         contextImages: [AttachedImage] = [],
         operation: Operation,
-        formats: Set<OutputFormat>,
-        containerFormat: OutputContainerFormat,
         model: AIModel,
         apiKey: String
     ) async throws -> [OutputBlock] {
         let prompt = SubmitPrompt(
             model: model,
             operation: operation,
-            formats: formats,
-            containerFormat: containerFormat,
             input: input,
             context: context,
             customInstructions: customInstructions,
@@ -54,34 +56,28 @@ enum AIWritingService {
             contextImages: contextImages
         )
 
-        let text: String
+        let blocks: [OutputBlock]
         switch model.provider {
         case .openai:
-            text = try await OpenAIService.submit(prompt: prompt, apiKey: apiKey)
+            blocks = try await OpenAIService.submit(prompt: prompt, apiKey: apiKey)
         case .anthropic:
-            text = try await AnthropicService.submit(prompt: prompt, apiKey: apiKey)
+            blocks = try await AnthropicService.submit(prompt: prompt, apiKey: apiKey)
         case .google:
             throw AIWritingServiceError.unsupportedProvider(model.provider)
         }
 
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            throw AIWritingServiceError.missingOutput
-        }
-
-        let blocks = MarkdownOutputParser.parse(trimmed)
         guard !blocks.isEmpty else {
-            throw AIWritingServiceError.missingOutput
+            throw AIWritingServiceError.emptyBlocks
         }
 
         return blocks
     }
 }
 
-private enum OpenAIService {
+enum OpenAIService {
     private static let endpoint = URL(string: "https://api.openai.com/v1/responses")!
 
-    static func submit(prompt: SubmitPrompt, apiKey: String) async throws -> String {
+    static func submit(prompt: SubmitPrompt, apiKey: String) async throws -> [OutputBlock] {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -99,15 +95,30 @@ private enum OpenAIService {
             throw AIWritingServiceError.apiError(message)
         }
 
-        return try JSONDecoder().decode(OpenAIResponseBody.self, from: data).outputText
+        return try decodeBlocks(from: data)
+    }
+
+    static func decodeBlocks(from data: Data) throws -> [OutputBlock] {
+        let body = try JSONDecoder().decode(OpenAIResponseBody.self, from: data)
+        let text = body.outputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            throw AIWritingServiceError.missingOutput
+        }
+
+        do {
+            let structured = try JSONDecoder().decode(StructuredOutput.self, from: Data(text.utf8))
+            return structured.blocks
+        } catch {
+            throw AIWritingServiceError.invalidStructuredOutput(underlying: error)
+        }
     }
 }
 
-private enum AnthropicService {
+enum AnthropicService {
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     private static let apiVersion = "2023-06-01"
 
-    static func submit(prompt: SubmitPrompt, apiKey: String) async throws -> String {
+    static func submit(prompt: SubmitPrompt, apiKey: String) async throws -> [OutputBlock] {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -126,11 +137,26 @@ private enum AnthropicService {
             throw AIWritingServiceError.apiError(message)
         }
 
-        return try JSONDecoder().decode(AnthropicResponseBody.self, from: data).outputText
+        return try decodeBlocks(from: data)
+    }
+
+    static func decodeBlocks(from data: Data) throws -> [OutputBlock] {
+        let body = try JSONDecoder().decode(AnthropicResponseBody.self, from: data)
+        guard let toolBlock = body.content.first(where: { $0.type == "tool_use" }) else {
+            throw AIWritingServiceError.missingOutput
+        }
+        guard let structured = toolBlock.input else {
+            throw AIWritingServiceError.invalidStructuredOutput(
+                underlying: DecodingError.dataCorrupted(
+                    .init(codingPath: [], debugDescription: "tool_use block missing structured input")
+                )
+            )
+        }
+        return structured.blocks
     }
 }
 
-private struct SubmitPrompt {
+struct SubmitPrompt {
     let model: AIModel
     let input: String
     let instructions: String
@@ -142,8 +168,6 @@ private struct SubmitPrompt {
     init(
         model: AIModel,
         operation: Operation,
-        formats: Set<OutputFormat>,
-        containerFormat: OutputContainerFormat,
         input: String,
         context: String,
         customInstructions: String,
@@ -157,7 +181,6 @@ private struct SubmitPrompt {
 
         var sections: [String] = [
             operation.instructions,
-            OutputFormat.guidance(for: formats, containerFormat: containerFormat),
         ]
 
         let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -190,6 +213,7 @@ private struct SubmitPrompt {
 
         sections.append("""
         Global output rules (apply to every response, override any conflicting guidance above):
+        - Always emit your final answer using the structured output schema. Do not reply with prose only — every response must populate the `blocks` array. (Anthropic providers: call the `\(StructuredOutputSchema.toolName)` tool exactly once.)
         - Never use em dashes (—, U+2014) in the output. This applies to all prose, bullets, headings, table cells, and any other generated text.
         - Do not substitute en dashes (–) for em dashes either. Rewrite the sentence using a comma, semicolon, colon, parentheses, or two shorter sentences instead.
         """)
@@ -198,11 +222,12 @@ private struct SubmitPrompt {
     }
 }
 
-private struct OpenAISubmitRequest: Encodable {
+struct OpenAISubmitRequest: Encodable {
     let model: String
     let reasoning: Reasoning?
     let instructions: String
     let input: OpenAIInput
+    let text: OpenAIText
 
     init(prompt: SubmitPrompt) {
         self.model = prompt.model.apiModelID
@@ -226,10 +251,31 @@ private struct OpenAISubmitRequest: Encodable {
         } else {
             self.input = .text(prompt.input)
         }
+        self.text = OpenAIText(
+            format: OpenAIResponseFormat(
+                name: StructuredOutputSchema.responseFormatName,
+                schema: RawJSON(StructuredOutputSchema.schemaData)
+            )
+        )
     }
 }
 
-private enum OpenAIInput: Encodable {
+struct OpenAIText: Encodable {
+    let format: OpenAIResponseFormat
+}
+
+struct OpenAIResponseFormat: Encodable {
+    let type = "json_schema"
+    let name: String
+    let schema: RawJSON
+    let strict = true
+
+    private enum CodingKeys: String, CodingKey {
+        case type, name, schema, strict
+    }
+}
+
+enum OpenAIInput: Encodable {
     case text(String)
     case multimodal([OpenAIInputItem])
 
@@ -244,12 +290,12 @@ private enum OpenAIInput: Encodable {
     }
 }
 
-private struct OpenAIInputItem: Encodable {
+struct OpenAIInputItem: Encodable {
     let role: String
     let content: [OpenAIInputContent]
 }
 
-private enum OpenAIInputContent: Encodable {
+enum OpenAIInputContent: Encodable {
     case text(String)
     case image(url: String)
 
@@ -272,17 +318,19 @@ private enum OpenAIInputContent: Encodable {
     }
 }
 
-private struct Reasoning: Encodable {
+struct Reasoning: Encodable {
     let effort: String
 }
 
-private struct AnthropicSubmitRequest: Encodable {
+struct AnthropicSubmitRequest: Encodable {
     let model: String
     let maxTokens: Int
     let system: String
     let thinking: AnthropicThinking?
     let outputConfig: AnthropicOutputConfig?
     let messages: [AnthropicMessage]
+    let tools: [AnthropicTool]
+    let toolChoice: AnthropicToolChoice
 
     private enum CodingKeys: String, CodingKey {
         case model
@@ -291,14 +339,16 @@ private struct AnthropicSubmitRequest: Encodable {
         case thinking
         case outputConfig = "output_config"
         case messages
+        case tools
+        case toolChoice = "tool_choice"
     }
 
     init(prompt: SubmitPrompt) {
         self.model = prompt.model.apiModelID
         self.maxTokens = prompt.model.anthropicMaxTokens
         self.system = prompt.instructions
-        if prompt.model.provider == .anthropic,
-           let effort = prompt.model.reasoningEffort {
+        let thinkingEnabled = prompt.model.provider == .anthropic && prompt.model.reasoningEffort != nil
+        if thinkingEnabled, let effort = prompt.model.reasoningEffort {
             self.thinking = AnthropicThinking(type: "adaptive")
             self.outputConfig = AnthropicOutputConfig(effort: effort.rawValue)
         } else {
@@ -321,23 +371,31 @@ private struct AnthropicSubmitRequest: Encodable {
         } else {
             self.messages = [AnthropicMessage(role: "user", content: .text(prompt.input))]
         }
+        self.tools = [
+            AnthropicTool(
+                name: StructuredOutputSchema.toolName,
+                description: StructuredOutputSchema.description,
+                inputSchema: RawJSON(StructuredOutputSchema.schemaData)
+            )
+        ]
+        self.toolChoice = thinkingEnabled ? .auto : .forceAny
     }
 }
 
-private struct AnthropicThinking: Encodable {
+struct AnthropicThinking: Encodable {
     let type: String
 }
 
-private struct AnthropicOutputConfig: Encodable {
+struct AnthropicOutputConfig: Encodable {
     let effort: String
 }
 
-private struct AnthropicMessage: Encodable {
+struct AnthropicMessage: Encodable {
     let role: String
     let content: AnthropicMessageContent
 }
 
-private enum AnthropicMessageContent: Encodable {
+enum AnthropicMessageContent: Encodable {
     case text(String)
     case blocks([AnthropicContentBlock])
 
@@ -352,7 +410,7 @@ private enum AnthropicMessageContent: Encodable {
     }
 }
 
-private enum AnthropicContentBlock: Encodable {
+enum AnthropicContentBlock: Encodable {
     case text(String)
     case image(mediaType: String, data: String)
 
@@ -382,6 +440,44 @@ private enum AnthropicContentBlock: Encodable {
     }
 }
 
+struct AnthropicTool: Encodable {
+    let name: String
+    let description: String
+    let inputSchema: RawJSON
+
+    private enum CodingKeys: String, CodingKey {
+        case name, description
+        case inputSchema = "input_schema"
+    }
+}
+
+enum AnthropicToolChoice: Encodable {
+    /// Forces the model to call exactly one tool. Used when extended thinking
+    /// is OFF.
+    case forceAny
+    /// Lets the model decide. Required when extended thinking is ON —
+    /// Anthropic rejects both `tool` and `any` in that mode. Combined with
+    /// an explicit prompt directive, the model still reliably calls our
+    /// single tool.
+    case auto
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .forceAny:
+            try c.encode("any", forKey: .type)
+            try c.encode(true, forKey: .disableParallelToolUse)
+        case .auto:
+            try c.encode("auto", forKey: .type)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case disableParallelToolUse = "disable_parallel_tool_use"
+    }
+}
+
 private extension AIModel {
     var anthropicMaxTokens: Int {
         switch reasoningEffort {
@@ -393,7 +489,7 @@ private extension AIModel {
     }
 }
 
-private struct OpenAIResponseBody: Decodable {
+struct OpenAIResponseBody: Decodable {
     let output: [OutputItem]
 
     var outputText: String {
@@ -407,7 +503,7 @@ private struct OpenAIResponseBody: Decodable {
     }
 }
 
-private struct OutputItem: Decodable {
+struct OutputItem: Decodable {
     let content: [OutputContent]
 
     private enum CodingKeys: String, CodingKey {
@@ -420,218 +516,26 @@ private struct OutputItem: Decodable {
     }
 }
 
-private struct OutputContent: Decodable {
+struct OutputContent: Decodable {
     let type: String
     let text: String?
 }
 
-private struct AnthropicResponseBody: Decodable {
+struct AnthropicResponseBody: Decodable {
     let content: [AnthropicOutputContent]
-
-    var outputText: String {
-        content
-            .compactMap { content -> String? in
-                guard content.type == "text" else { return nil }
-                return content.text
-            }
-            .joined(separator: "\n")
-    }
 }
 
-private struct AnthropicOutputContent: Decodable {
+struct AnthropicOutputContent: Decodable {
     let type: String
     let text: String?
+    let name: String?
+    let input: StructuredOutput?
 }
 
-private struct APIErrorResponse: Decodable {
+struct APIErrorResponse: Decodable {
     let error: APIError
 }
 
-private struct APIError: Decodable {
+struct APIError: Decodable {
     let message: String
-}
-
-private enum MarkdownOutputParser {
-    static func parse(_ text: String) -> [OutputBlock] {
-        let lines = text
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-            .components(separatedBy: "\n")
-
-        var blocks: [OutputBlock] = []
-        var paragraphLines: [String] = []
-        var bulletItems: [String] = []
-        var index = 0
-
-        func flushParagraph() {
-            let paragraph = paragraphLines
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if !paragraph.isEmpty {
-                blocks.append(.paragraph(text: paragraph))
-            }
-            paragraphLines = []
-        }
-
-        func flushBullets() {
-            if !bulletItems.isEmpty {
-                blocks.append(.bulletList(items: bulletItems))
-            }
-            bulletItems = []
-        }
-
-        while index < lines.count {
-            let rawLine = lines[index]
-            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if line.isEmpty {
-                flushParagraph()
-                flushBullets()
-                index += 1
-                continue
-            }
-
-            if let fence = parseFence(lines: lines, start: index) {
-                flushParagraph()
-                flushBullets()
-                blocks.append(.codeBlock(language: fence.language, code: fence.code))
-                index = fence.nextIndex
-                continue
-            }
-
-            if let table = parseTable(lines: lines, start: index) {
-                flushParagraph()
-                flushBullets()
-                blocks.append(.table(head: table.head, rows: table.rows))
-                index = table.nextIndex
-                continue
-            }
-
-            if let heading = parseHeading(line) {
-                flushParagraph()
-                flushBullets()
-                blocks.append(.heading(text: heading))
-                index += 1
-                continue
-            }
-
-            if let bullet = parseBullet(line) {
-                flushParagraph()
-                bulletItems.append(bullet)
-                index += 1
-                continue
-            }
-
-            flushBullets()
-            paragraphLines.append(line)
-            index += 1
-        }
-
-        flushParagraph()
-        flushBullets()
-
-        return blocks
-    }
-
-    private static func parseFence(lines: [String], start: Int) -> (language: String?, code: String, nextIndex: Int)? {
-        let opener = lines[start].trimmingCharacters(in: .whitespacesAndNewlines)
-        guard opener.hasPrefix("```") else { return nil }
-
-        let afterTicks = opener.drop { $0 == "`" }
-        let langRaw = afterTicks.trimmingCharacters(in: .whitespacesAndNewlines)
-        let language = langRaw.isEmpty ? nil : langRaw
-
-        var codeLines: [String] = []
-        var index = start + 1
-        while index < lines.count {
-            let trimmed = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.hasPrefix("```"), trimmed.allSatisfy({ $0 == "`" }) {
-                return (language, codeLines.joined(separator: "\n"), index + 1)
-            }
-            codeLines.append(lines[index])
-            index += 1
-        }
-
-        // Unclosed fence — return what we captured so content isn't dropped.
-        return (language, codeLines.joined(separator: "\n"), index)
-    }
-
-    private static func parseHeading(_ line: String) -> String? {
-        guard line.hasPrefix("#") else { return nil }
-        let title = line.drop { $0 == "#" || $0 == " " }
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return title.isEmpty ? nil : title
-    }
-
-    private static func parseBullet(_ line: String) -> String? {
-        let markers = ["- ", "* ", "\u{2022} "]
-        guard let marker = markers.first(where: { line.hasPrefix($0) }) else {
-            return nil
-        }
-
-        let item = String(line.dropFirst(marker.count))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return item.isEmpty ? nil : item
-    }
-
-    private static func parseTable(lines: [String], start: Int) -> (head: [String], rows: [[String]], nextIndex: Int)? {
-        guard start + 1 < lines.count else { return nil }
-
-        let headerLine = lines[start].trimmingCharacters(in: .whitespacesAndNewlines)
-        let separatorLine = lines[start + 1].trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard headerLine.contains("|"),
-              isTableSeparator(separatorLine) else {
-            return nil
-        }
-
-        let head = tableCells(from: headerLine)
-        guard !head.isEmpty else { return nil }
-
-        var rows: [[String]] = []
-        var index = start + 2
-
-        while index < lines.count {
-            let line = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard line.contains("|"), !line.isEmpty else { break }
-
-            let cells = tableCells(from: line)
-            if !cells.isEmpty {
-                rows.append(normalizedRow(cells, width: head.count))
-            }
-            index += 1
-        }
-
-        guard !rows.isEmpty else { return nil }
-        return (head, rows, index)
-    }
-
-    private static func isTableSeparator(_ line: String) -> Bool {
-        guard line.contains("|") else { return false }
-        let cells = tableCells(from: line)
-        guard !cells.isEmpty else { return false }
-        return cells.allSatisfy { cell in
-            let stripped = cell.replacingOccurrences(of: ":", with: "")
-            return stripped.count >= 3 && stripped.allSatisfy { $0 == "-" }
-        }
-    }
-
-    private static func tableCells(from line: String) -> [String] {
-        var trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("|") { trimmed.removeFirst() }
-        if trimmed.hasSuffix("|") { trimmed.removeLast() }
-
-        return trimmed
-            .split(separator: "|", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-    }
-
-    private static func normalizedRow(_ row: [String], width: Int) -> [String] {
-        if row.count == width { return row }
-        if row.count > width { return Array(row.prefix(width)) }
-        return row + Array(repeating: "", count: width - row.count)
-    }
 }

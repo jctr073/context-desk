@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 struct RecentItem: Identifiable, Hashable, Codable {
     let id: String
@@ -176,33 +177,102 @@ struct RecentItem: Identifiable, Hashable, Codable {
     }()
 }
 
+private let historyLogger = Logger(subsystem: "com.writingbuddy.app", category: "history")
+
 enum HistoryStore {
-    private static let key = "WritingBuddy.history.v1"
+    private static let userDefaultsKey = "WritingBuddy.history.v1"
     static let maxItems = 15
 
-    static func load() -> [RecentItem] {
-        guard let data = UserDefaults.standard.data(forKey: key) else {
-            return []
-        }
+    /// Overridable for tests. Defaults to `~/Library/Application Support/com.writingbuddy.app/history.json`.
+    static var fileURL: URL = defaultFileURL()
+    /// Overridable for tests. Defaults to `.standard`.
+    static var defaults: UserDefaults = .standard
 
+    private static func defaultFileURL() -> URL {
+        let base: URL
         do {
-            let items = try JSONDecoder()
-                .decode([RecentItem].self, from: data)
-                .sorted { $0.createdAt > $1.createdAt }
-            return Array(items.prefix(maxItems))
+            base = try FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
         } catch {
+            historyLogger.error("Could not resolve Application Support; falling back to tmp: \(error.localizedDescription, privacy: .public)")
+            base = URL(fileURLWithPath: NSTemporaryDirectory())
+        }
+        return base
+            .appendingPathComponent("com.writingbuddy.app", isDirectory: true)
+            .appendingPathComponent("history.json")
+    }
+
+    static func load() -> [RecentItem] {
+        let url = fileURL
+        if FileManager.default.fileExists(atPath: url.path) {
+            // Defensive: if a stale legacy blob is still around, drop it.
+            if defaults.data(forKey: userDefaultsKey) != nil {
+                defaults.removeObject(forKey: userDefaultsKey)
+            }
+            return decodeFile(at: url)
+        }
+        return migrateFromUserDefaults()
+    }
+
+    @discardableResult
+    static func save(_ items: [RecentItem]) -> Task<Void, Never> {
+        let trimmed = Array(items.sorted { $0.createdAt > $1.createdAt }.prefix(maxItems))
+        let url = fileURL
+        return Task { await HistoryWriter.shared.write(trimmed, to: url) }
+    }
+
+    private static func decodeFile(at url: URL) -> [RecentItem] {
+        do {
+            let data = try Data(contentsOf: url)
+            let items = try JSONDecoder().decode([RecentItem].self, from: data)
+            return Array(items.sorted { $0.createdAt > $1.createdAt }.prefix(maxItems))
+        } catch {
+            historyLogger.error("Failed to read history file at \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return []
         }
     }
 
-    static func save(_ items: [RecentItem]) {
-        let limitedItems = Array(items.prefix(maxItems))
-
+    private static func migrateFromUserDefaults() -> [RecentItem] {
+        guard let data = defaults.data(forKey: userDefaultsKey) else { return [] }
+        let items: [RecentItem]
         do {
-            let data = try JSONEncoder().encode(limitedItems)
-            UserDefaults.standard.set(data, forKey: key)
+            items = try JSONDecoder().decode([RecentItem].self, from: data)
         } catch {
-            return
+            historyLogger.error("Failed to decode legacy UserDefaults history; leaving key intact for postmortem: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+        let trimmed = Array(items.sorted { $0.createdAt > $1.createdAt }.prefix(maxItems))
+        do {
+            try writeAtomically(trimmed, to: fileURL)
+        } catch {
+            historyLogger.error("Migration write to \(fileURL.path, privacy: .public) failed; leaving UserDefaults key intact: \(error.localizedDescription, privacy: .public)")
+            return trimmed
+        }
+        defaults.removeObject(forKey: userDefaultsKey)
+        historyLogger.info("Migrated \(trimmed.count, privacy: .public) history items from UserDefaults to \(fileURL.path, privacy: .public)")
+        return trimmed
+    }
+
+    static func writeAtomically(_ items: [RecentItem], to url: URL) throws {
+        let dir = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let data = try JSONEncoder().encode(items)
+        try data.write(to: url, options: [.atomic])
+    }
+}
+
+private actor HistoryWriter {
+    static let shared = HistoryWriter()
+
+    func write(_ items: [RecentItem], to url: URL) {
+        do {
+            try HistoryStore.writeAtomically(items, to: url)
+        } catch {
+            historyLogger.error("Failed to write history file at \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
 }

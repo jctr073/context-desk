@@ -286,8 +286,6 @@ final class AppState: ObservableObject {
                     inputImages: inputImages,
                     contextImages: contextImages,
                     operation: operation,
-                    formats: formats,
-                    containerFormat: containerFormat,
                     model: model,
                     apiKey: apiKey
                 )
@@ -309,7 +307,11 @@ final class AppState: ObservableObject {
             } catch {
                 guard !Task.isCancelled, let self else { return }
                 await MainActor.run {
-                    self.output = [.paragraph(text: "\(model.provider.keyLabel) request failed. Please check your API key and try again.")]
+                    let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    self.output = [
+                        .heading(text: "\(model.provider.keyLabel) request failed"),
+                        .paragraph(text: detail),
+                    ]
                     self.running = false
                 }
             }

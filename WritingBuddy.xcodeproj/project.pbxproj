@@ -50,6 +50,12 @@
 		WBBLD000000000000000041 /* OutputContainerFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000041 /* OutputContainerFormat.swift */; };
 		WBBLD000000000000000042 /* FormatDropdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000042 /* FormatDropdown.swift */; };
 		WBBLD000000000000000043 /* DraggableDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000043 /* DraggableDivider.swift */; };
+		WBBLD000000000000000044 /* StructuredOutputSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000044 /* StructuredOutputSchema.swift */; };
+		WBBLD000000000000000050 /* OutputBlockCodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000050 /* OutputBlockCodingTests.swift */; };
+		WBBLD000000000000000051 /* StructuredOutputSchemaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000051 /* StructuredOutputSchemaTests.swift */; };
+		WBBLD000000000000000052 /* OpenAIResponseDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000052 /* OpenAIResponseDecodingTests.swift */; };
+		WBBLD000000000000000053 /* AnthropicResponseDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000053 /* AnthropicResponseDecodingTests.swift */; };
+		WBBLD000000000000000054 /* SubmitPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000054 /* SubmitPromptTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -96,7 +102,14 @@
 		WBFILE00000000000000041 /* OutputContainerFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputContainerFormat.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000042 /* FormatDropdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatDropdown.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000043 /* DraggableDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraggableDivider.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000044 /* StructuredOutputSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredOutputSchema.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000050 /* OutputBlockCodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputBlockCodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000051 /* StructuredOutputSchemaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuredOutputSchemaTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000052 /* OpenAIResponseDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIResponseDecodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000053 /* AnthropicResponseDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicResponseDecodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000054 /* SubmitPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubmitPromptTests.swift; sourceTree = "<group>"; };
 		WBPRODUCT0000000000000001 /* WritingBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WritingBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WritingBuddyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,6 +121,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		WBFRAMEWORKS00000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -115,14 +135,28 @@
 			isa = PBXGroup;
 			children = (
 				WBGROUP00000000000000003 /* WritingBuddy */,
+				WBGROUP00000000000000008 /* WritingBuddyTests */,
 				WBGROUP00000000000000002 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		WBGROUP00000000000000008 /* WritingBuddyTests */ = {
+			isa = PBXGroup;
+			children = (
+				WBFILE00000000000000050 /* OutputBlockCodingTests.swift */,
+				WBFILE00000000000000051 /* StructuredOutputSchemaTests.swift */,
+				WBFILE00000000000000052 /* OpenAIResponseDecodingTests.swift */,
+				WBFILE00000000000000053 /* AnthropicResponseDecodingTests.swift */,
+				WBFILE00000000000000054 /* SubmitPromptTests.swift */,
+			);
+			path = WritingBuddyTests;
 			sourceTree = "<group>";
 		};
 		WBGROUP00000000000000002 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				WBPRODUCT0000000000000001 /* WritingBuddy.app */,
+				WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -158,6 +192,7 @@
 				WBFILE00000000000000041 /* OutputContainerFormat.swift */,
 				WBFILE00000000000000007 /* OutputBlock.swift */,
 				WBFILE00000000000000033 /* OutputBlock+Markdown.swift */,
+				WBFILE00000000000000044 /* StructuredOutputSchema.swift */,
 				WBFILE00000000000000008 /* RecentItem.swift */,
 				WBFILE00000000000000009 /* AIModel.swift */,
 				WBFILE00000000000000010 /* MockGenerator.swift */,
@@ -229,7 +264,42 @@
 			productReference = WBPRODUCT0000000000000001 /* WritingBuddy.app */;
 			productType = "com.apple.product-type.application";
 		};
+		WBTARGET000000000000000002 /* WritingBuddyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = WBCFGLIST0000000000000003 /* Build configuration list for PBXNativeTarget "WritingBuddyTests" */;
+			buildPhases = (
+				WBSOURCES000000000000002 /* Sources */,
+				WBFRAMEWORKS00000000000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				WBDEPENDENCY000000000001 /* PBXTargetDependency */,
+			);
+			name = WritingBuddyTests;
+			productName = WritingBuddyTests;
+			productReference = WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		WBDEPENDENCY000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = WBTARGET000000000000000001 /* WritingBuddy */;
+			targetProxy = WBPROXY00000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXContainerItemProxy section */
+		WBPROXY00000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = WBPROJECT00000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = WBTARGET000000000000000001;
+			remoteInfo = WritingBuddy;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXProject section */
 		WBPROJECT00000000000000001 /* Project object */ = {
@@ -241,6 +311,10 @@
 				TargetAttributes = {
 					WBTARGET000000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					WBTARGET000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = WBTARGET000000000000000001;
 					};
 				};
 			};
@@ -261,6 +335,7 @@
 			projectRoot = "";
 			targets = (
 				WBTARGET000000000000000001 /* WritingBuddy */,
+				WBTARGET000000000000000002 /* WritingBuddyTests */,
 			);
 		};
 /* End PBXProject section */
@@ -322,6 +397,19 @@
 				WBBLD000000000000000041 /* OutputContainerFormat.swift in Sources */,
 				WBBLD000000000000000042 /* FormatDropdown.swift in Sources */,
 				WBBLD000000000000000043 /* DraggableDivider.swift in Sources */,
+				WBBLD000000000000000044 /* StructuredOutputSchema.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		WBSOURCES000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				WBBLD000000000000000050 /* OutputBlockCodingTests.swift in Sources */,
+				WBBLD000000000000000051 /* StructuredOutputSchemaTests.swift in Sources */,
+				WBBLD000000000000000052 /* OpenAIResponseDecodingTests.swift in Sources */,
+				WBBLD000000000000000053 /* AnthropicResponseDecodingTests.swift in Sources */,
+				WBBLD000000000000000054 /* SubmitPromptTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -496,6 +584,42 @@
 			};
 			name = Release;
 		};
+		WBCFGTGTDEBUG000000000002 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.writingbuddy.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WritingBuddy.app/Contents/MacOS/WritingBuddy";
+			};
+			name = Debug;
+		};
+		WBCFGTGTREL00000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.writingbuddy.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WritingBuddy.app/Contents/MacOS/WritingBuddy";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -513,6 +637,15 @@
 			buildConfigurations = (
 				WBCFGTGTDEBUG000000000001 /* Debug */,
 				WBCFGTGTREL00000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		WBCFGLIST0000000000000003 /* Build configuration list for PBXNativeTarget "WritingBuddyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				WBCFGTGTDEBUG000000000002 /* Debug */,
+				WBCFGTGTREL00000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

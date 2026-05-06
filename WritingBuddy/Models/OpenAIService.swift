@@ -18,8 +18,8 @@ enum AIWritingServiceError: LocalizedError {
             return message
         case .missingOutput:
             return "The AI provider did not return any improved text."
-        case .invalidStructuredOutput:
-            return "The AI provider returned output we couldn't parse. Try again, or switch models."
+        case .invalidStructuredOutput(let underlying):
+            return "The AI provider returned output we couldn't parse. Try again, or switch models.\n\nDetail: \(underlying.localizedDescription)"
         case .emptyBlocks:
             return "The AI provider returned an empty response."
         }
@@ -74,6 +74,65 @@ enum AIWritingService {
     }
 }
 
+extension AIWritingService {
+    static func submitStream(
+        input: String,
+        context: String = "",
+        customInstructions: String = "",
+        inputImages: [AttachedImage] = [],
+        contextImages: [AttachedImage] = [],
+        operation: Operation,
+        model: AIModel,
+        apiKey: String
+    ) -> AsyncThrowingStream<[OutputBlock], Error> {
+        AsyncThrowingStream<[OutputBlock], Error> { continuation in
+            let task = Task {
+                let prompt = SubmitPrompt(
+                    model: model,
+                    operation: operation,
+                    input: input,
+                    context: context,
+                    customInstructions: customInstructions,
+                    inputImages: inputImages,
+                    contextImages: contextImages
+                )
+
+                let inner: AsyncThrowingStream<[OutputBlock], Error>
+                switch model.provider {
+                case .openai:
+                    inner = OpenAIService.submitStream(prompt: prompt, apiKey: apiKey)
+                case .anthropic:
+                    inner = AnthropicService.submitStream(prompt: prompt, apiKey: apiKey)
+                case .google:
+                    continuation.finish(throwing: AIWritingServiceError.unsupportedProvider(model.provider))
+                    return
+                }
+
+                do {
+                    var sawNonEmpty = false
+                    for try await snapshot in inner {
+                        if !snapshot.isEmpty {
+                            sawNonEmpty = true
+                        }
+                        continuation.yield(snapshot)
+                    }
+                    if !sawNonEmpty {
+                        continuation.finish(throwing: AIWritingServiceError.emptyBlocks)
+                    } else {
+                        continuation.finish()
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+}
+
 enum OpenAIService {
     private static let endpoint = URL(string: "https://api.openai.com/v1/responses")!
 
@@ -110,6 +169,119 @@ enum OpenAIService {
             return structured.blocks
         } catch {
             throw AIWritingServiceError.invalidStructuredOutput(underlying: error)
+        }
+    }
+}
+
+extension OpenAIService {
+    static func submitStream(prompt: SubmitPrompt, apiKey: String) -> AsyncThrowingStream<[OutputBlock], Error> {
+        AsyncThrowingStream<[OutputBlock], Error> { continuation in
+            let task = Task {
+                do {
+                    var request = URLRequest(url: endpoint)
+                    request.httpMethod = "POST"
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.httpBody = try JSONEncoder().encode(OpenAISubmitRequest(prompt: prompt, stream: true))
+
+                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw AIWritingServiceError.invalidResponse
+                    }
+                    guard (200..<300).contains(httpResponse.statusCode) else {
+                        var buffer = Data()
+                        for try await byte in bytes {
+                            buffer.append(byte)
+                        }
+                        let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: buffer)
+                        let message = errorResponse?.error.message ?? "OpenAI request failed with status \(httpResponse.statusCode)."
+                        throw AIWritingServiceError.apiError(message)
+                    }
+
+                    let events = SSEEventStream.events(from: bytes)
+                    for try await snapshot in decodeStream(events: events) {
+                        continuation.yield(snapshot)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
+    static func decodeStream<S: AsyncSequence>(events: S) -> AsyncThrowingStream<[OutputBlock], Error> where S.Element == SSEEvent {
+        AsyncThrowingStream<[OutputBlock], Error> { continuation in
+            let task = Task {
+                let parser = StreamingOutputParser()
+                var lastYielded: [OutputBlock] = []
+                var eventTypeCounts: [String: Int] = [:]
+
+                func yieldFinal() -> Bool {
+                    do {
+                        let final = try parser.finish()
+                        if final != lastYielded {
+                            continuation.yield(final)
+                            lastYielded = final
+                        }
+                        return true
+                    } catch {
+                        let buf = parser.bufferDebugString
+                        print("[OpenAI stream] finish() failed: \(error)")
+                        print("[OpenAI stream] event counts: \(eventTypeCounts)")
+                        print("[OpenAI stream] buffer (\(buf.count) chars): \(buf.prefix(2000))")
+                        continuation.finish(throwing: AIWritingServiceError.invalidStructuredOutput(underlying: error))
+                        return false
+                    }
+                }
+
+                do {
+                    for try await event in events {
+                        guard let payload = parseJSONObject(event.data) else {
+                            eventTypeCounts["<unparsable>", default: 0] += 1
+                            continue
+                        }
+                        let type = payload["type"] as? String ?? "<missing>"
+                        eventTypeCounts[type, default: 0] += 1
+
+                        switch type {
+                        case "response.output_text.delta":
+                            guard let delta = payload["delta"] as? String else { continue }
+                            parser.feed(delta)
+                            let snap = parser.snapshot
+                            if snap != lastYielded {
+                                continuation.yield(snap)
+                                lastYielded = snap
+                            }
+                        case "response.completed":
+                            if yieldFinal() {
+                                continuation.finish()
+                            }
+                            return
+                        case "response.error", "error":
+                            let message = extractErrorMessage(from: payload) ?? "OpenAI streaming error."
+                            print("[OpenAI stream] error event: \(message). Payload: \(payload)")
+                            continuation.finish(throwing: AIWritingServiceError.apiError(message))
+                            return
+                        default:
+                            continue
+                        }
+                    }
+
+                    if yieldFinal() {
+                        continuation.finish()
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
     }
 }
@@ -154,6 +326,170 @@ enum AnthropicService {
         }
         return structured.blocks
     }
+}
+
+extension AnthropicService {
+    static func submitStream(prompt: SubmitPrompt, apiKey: String) -> AsyncThrowingStream<[OutputBlock], Error> {
+        AsyncThrowingStream<[OutputBlock], Error> { continuation in
+            let task = Task {
+                do {
+                    var request = URLRequest(url: endpoint)
+                    request.httpMethod = "POST"
+                    request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+                    request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.httpBody = try JSONEncoder().encode(AnthropicSubmitRequest(prompt: prompt, stream: true))
+
+                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw AIWritingServiceError.invalidResponse
+                    }
+                    guard (200..<300).contains(httpResponse.statusCode) else {
+                        var buffer = Data()
+                        for try await byte in bytes {
+                            buffer.append(byte)
+                        }
+                        let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: buffer)
+                        let message = errorResponse?.error.message ?? "Anthropic request failed with status \(httpResponse.statusCode)."
+                        throw AIWritingServiceError.apiError(message)
+                    }
+
+                    let events = SSEEventStream.events(from: bytes)
+                    for try await snapshot in decodeStream(events: events) {
+                        continuation.yield(snapshot)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
+    static func decodeStream<S: AsyncSequence>(events: S) -> AsyncThrowingStream<[OutputBlock], Error> where S.Element == SSEEvent {
+        AsyncThrowingStream<[OutputBlock], Error> { continuation in
+            let task = Task {
+                let parser = StreamingOutputParser()
+                var lastYielded: [OutputBlock] = []
+                var toolUseIndex: Int? = nil
+                var didFinalize = false
+                var finalizeFailed = false
+                var eventTypeCounts: [String: Int] = [:]
+                var contentBlockTypes: [Int: String] = [:]
+
+                func finalizeOnce() {
+                    guard !didFinalize else { return }
+                    didFinalize = true
+                    do {
+                        let final = try parser.finish()
+                        if final != lastYielded {
+                            continuation.yield(final)
+                            lastYielded = final
+                        }
+                    } catch {
+                        finalizeFailed = true
+                        let buf = parser.bufferDebugString
+                        print("[Anthropic stream] finish() failed: \(error)")
+                        print("[Anthropic stream] event counts: \(eventTypeCounts)")
+                        print("[Anthropic stream] content_block types by index: \(contentBlockTypes)")
+                        print("[Anthropic stream] tool_use index: \(String(describing: toolUseIndex))")
+                        print("[Anthropic stream] buffer (\(buf.count) chars): \(buf.prefix(2000))")
+                        continuation.finish(throwing: AIWritingServiceError.invalidStructuredOutput(underlying: error))
+                    }
+                }
+
+                do {
+                    for try await event in events {
+                        guard let payload = parseJSONObject(event.data) else {
+                            eventTypeCounts["<unparsable>", default: 0] += 1
+                            continue
+                        }
+                        let type = payload["type"] as? String ?? "<missing>"
+                        eventTypeCounts[type, default: 0] += 1
+
+                        switch type {
+                        case "content_block_start":
+                            let idx = payload["index"] as? Int
+                            if let block = payload["content_block"] as? [String: Any] {
+                                let blockType = (block["type"] as? String) ?? "?"
+                                let blockName = (block["name"] as? String) ?? ""
+                                if let i = idx {
+                                    contentBlockTypes[i] = blockType + (blockName.isEmpty ? "" : "(\(blockName))")
+                                }
+                                if blockType == "tool_use",
+                                   blockName == StructuredOutputSchema.toolName,
+                                   let i = idx {
+                                    toolUseIndex = i
+                                }
+                            }
+                        case "content_block_delta":
+                            guard let idx = payload["index"] as? Int,
+                                  let target = toolUseIndex,
+                                  idx == target,
+                                  let delta = payload["delta"] as? [String: Any],
+                                  (delta["type"] as? String) == "input_json_delta",
+                                  let partial = delta["partial_json"] as? String else {
+                                continue
+                            }
+                            parser.feed(partial)
+                            let snap = parser.snapshot
+                            if snap != lastYielded {
+                                continuation.yield(snap)
+                                lastYielded = snap
+                            }
+                        case "content_block_stop":
+                            let idx = payload["index"] as? Int
+                            if let target = toolUseIndex, idx == target {
+                                finalizeOnce()
+                                if finalizeFailed { return }
+                            }
+                        case "message_stop":
+                            finalizeOnce()
+                            if finalizeFailed { return }
+                            continuation.finish()
+                            return
+                        case "error":
+                            let message = extractErrorMessage(from: payload) ?? "Anthropic streaming error."
+                            print("[Anthropic stream] error event: \(message). Payload: \(payload)")
+                            continuation.finish(throwing: AIWritingServiceError.apiError(message))
+                            return
+                        default:
+                            continue
+                        }
+                    }
+
+                    finalizeOnce()
+                    if finalizeFailed { return }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+}
+
+private func parseJSONObject(_ data: String) -> [String: Any]? {
+    guard let bytes = data.data(using: .utf8) else { return nil }
+    let obj = try? JSONSerialization.jsonObject(with: bytes, options: [.fragmentsAllowed])
+    return obj as? [String: Any]
+}
+
+private func extractErrorMessage(from payload: [String: Any]) -> String? {
+    if let err = payload["error"] as? [String: Any], let msg = err["message"] as? String {
+        return msg
+    }
+    if let msg = payload["message"] as? String {
+        return msg
+    }
+    return nil
 }
 
 struct SubmitPrompt {
@@ -228,8 +564,13 @@ struct OpenAISubmitRequest: Encodable {
     let instructions: String
     let input: OpenAIInput
     let text: OpenAIText
+    let stream: Bool?
 
-    init(prompt: SubmitPrompt) {
+    private enum CodingKeys: String, CodingKey {
+        case model, reasoning, instructions, input, text, stream
+    }
+
+    init(prompt: SubmitPrompt, stream: Bool = false) {
         self.model = prompt.model.apiModelID
         self.reasoning = prompt.model.reasoningEffort.map { Reasoning(effort: $0.rawValue) }
         self.instructions = prompt.instructions
@@ -257,6 +598,17 @@ struct OpenAISubmitRequest: Encodable {
                 schema: RawJSON(StructuredOutputSchema.schemaData)
             )
         )
+        self.stream = stream ? true : nil
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(model, forKey: .model)
+        try c.encodeIfPresent(reasoning, forKey: .reasoning)
+        try c.encode(instructions, forKey: .instructions)
+        try c.encode(input, forKey: .input)
+        try c.encode(text, forKey: .text)
+        try c.encodeIfPresent(stream, forKey: .stream)
     }
 }
 
@@ -331,6 +683,7 @@ struct AnthropicSubmitRequest: Encodable {
     let messages: [AnthropicMessage]
     let tools: [AnthropicTool]
     let toolChoice: AnthropicToolChoice
+    let stream: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case model
@@ -341,9 +694,10 @@ struct AnthropicSubmitRequest: Encodable {
         case messages
         case tools
         case toolChoice = "tool_choice"
+        case stream
     }
 
-    init(prompt: SubmitPrompt) {
+    init(prompt: SubmitPrompt, stream: Bool = false) {
         self.model = prompt.model.apiModelID
         self.maxTokens = prompt.model.anthropicMaxTokens
         self.system = prompt.instructions
@@ -379,6 +733,20 @@ struct AnthropicSubmitRequest: Encodable {
             )
         ]
         self.toolChoice = thinkingEnabled ? .auto : .forceAny
+        self.stream = stream ? true : nil
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(model, forKey: .model)
+        try c.encode(maxTokens, forKey: .maxTokens)
+        try c.encode(system, forKey: .system)
+        try c.encodeIfPresent(thinking, forKey: .thinking)
+        try c.encodeIfPresent(outputConfig, forKey: .outputConfig)
+        try c.encode(messages, forKey: .messages)
+        try c.encode(tools, forKey: .tools)
+        try c.encode(toolChoice, forKey: .toolChoice)
+        try c.encodeIfPresent(stream, forKey: .stream)
     }
 }
 

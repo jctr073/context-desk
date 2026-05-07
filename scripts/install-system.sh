@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-APP_NAME="WritingBuddy"
+APP_NAME="ContextDesk"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_PATH="$ROOT_DIR/.build/app/$APP_NAME.app"
 DESTINATION="/Applications/$APP_NAME.app"

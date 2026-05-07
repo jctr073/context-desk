@@ -1,9 +1,9 @@
 import SwiftUI
 
 @main
-struct WritingBuddyApp: App {
+struct ContextDeskApp: App {
     var body: some Scene {
-        WindowGroup("WritingBuddy") {
+        WindowGroup("ContextDesk") {
             ContentView()
         }
         .windowStyle(.hiddenTitleBar)

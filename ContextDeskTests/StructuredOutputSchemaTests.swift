@@ -1,5 +1,5 @@
 import XCTest
-@testable import WritingBuddy
+@testable import ContextDesk
 
 final class StructuredOutputSchemaTests: XCTestCase {
     func testRootIsStrictObject() throws {

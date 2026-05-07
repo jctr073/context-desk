@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		BCCD6C772FA84BF500588377 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = BCCD6C762FA84BF500588377 /* Highlightr */; };
-		WBBLD000000000000000001 /* WritingBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000001 /* WritingBuddyApp.swift */; };
+		WBBLD000000000000000001 /* ContextDeskApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000001 /* ContextDeskApp.swift */; };
 		WBBLD000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000002 /* AppState.swift */; };
 		WBBLD000000000000000003 /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000003 /* Palette.swift */; };
 		WBBLD000000000000000004 /* Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000004 /* Layout.swift */; };
@@ -68,7 +68,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		WBFILE00000000000000001 /* WritingBuddyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingBuddyApp.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000001 /* ContextDeskApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextDeskApp.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000003 /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000004 /* Layout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Layout.swift; sourceTree = "<group>"; };
@@ -126,8 +126,8 @@
 		WBFILE00000000000000066 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000067 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000068 /* ContextSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextSheet.swift; sourceTree = "<group>"; };
-		WBPRODUCT0000000000000001 /* WritingBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WritingBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WritingBuddyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		WBPRODUCT0000000000000001 /* ContextDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ContextDesk.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		WBPRODUCT0000000000000002 /* ContextDeskTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ContextDeskTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -152,13 +152,13 @@
 		WBGROUP00000000000000001 = {
 			isa = PBXGroup;
 			children = (
-				WBGROUP00000000000000003 /* WritingBuddy */,
-				WBGROUP00000000000000008 /* WritingBuddyTests */,
+				WBGROUP00000000000000003 /* ContextDesk */,
+				WBGROUP00000000000000008 /* ContextDeskTests */,
 				WBGROUP00000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		WBGROUP00000000000000008 /* WritingBuddyTests */ = {
+		WBGROUP00000000000000008 /* ContextDeskTests */ = {
 			isa = PBXGroup;
 			children = (
 				WBFILE00000000000000050 /* OutputBlockCodingTests.swift */,
@@ -172,22 +172,22 @@
 				WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */,
 				WBFILE00000000000000066 /* HistoryStoreTests.swift */,
 			);
-			path = WritingBuddyTests;
+			path = ContextDeskTests;
 			sourceTree = "<group>";
 		};
 		WBGROUP00000000000000002 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				WBPRODUCT0000000000000001 /* WritingBuddy.app */,
-				WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */,
+				WBPRODUCT0000000000000001 /* ContextDesk.app */,
+				WBPRODUCT0000000000000002 /* ContextDeskTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		WBGROUP00000000000000003 /* WritingBuddy */ = {
+		WBGROUP00000000000000003 /* ContextDesk */ = {
 			isa = PBXGroup;
 			children = (
-				WBFILE00000000000000001 /* WritingBuddyApp.swift */,
+				WBFILE00000000000000001 /* ContextDeskApp.swift */,
 				WBFILE00000000000000002 /* AppState.swift */,
 				WBGROUP00000000000000004 /* Theme */,
 				WBGROUP00000000000000005 /* Models */,
@@ -195,7 +195,7 @@
 				WBFILE00000000000000027 /* Assets.xcassets */,
 				WBFILE00000000000000028 /* Info.plist */,
 			);
-			path = WritingBuddy;
+			path = ContextDesk;
 			sourceTree = "<group>";
 		};
 		WBGROUP00000000000000004 /* Theme */ = {
@@ -274,9 +274,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		WBTARGET000000000000000001 /* WritingBuddy */ = {
+		WBTARGET000000000000000001 /* ContextDesk */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = WBCFGLIST0000000000000002 /* Build configuration list for PBXNativeTarget "WritingBuddy" */;
+			buildConfigurationList = WBCFGLIST0000000000000002 /* Build configuration list for PBXNativeTarget "ContextDesk" */;
 			buildPhases = (
 				WBSOURCES000000000000001 /* Sources */,
 				WBFRAMEWORKS00000000000001 /* Frameworks */,
@@ -286,14 +286,14 @@
 			);
 			dependencies = (
 			);
-			name = WritingBuddy;
-			productName = WritingBuddy;
-			productReference = WBPRODUCT0000000000000001 /* WritingBuddy.app */;
+			name = ContextDesk;
+			productName = ContextDesk;
+			productReference = WBPRODUCT0000000000000001 /* ContextDesk.app */;
 			productType = "com.apple.product-type.application";
 		};
-		WBTARGET000000000000000002 /* WritingBuddyTests */ = {
+		WBTARGET000000000000000002 /* ContextDeskTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = WBCFGLIST0000000000000003 /* Build configuration list for PBXNativeTarget "WritingBuddyTests" */;
+			buildConfigurationList = WBCFGLIST0000000000000003 /* Build configuration list for PBXNativeTarget "ContextDeskTests" */;
 			buildPhases = (
 				WBSOURCES000000000000002 /* Sources */,
 				WBFRAMEWORKS00000000000002 /* Frameworks */,
@@ -303,9 +303,9 @@
 			dependencies = (
 				WBDEPENDENCY000000000001 /* PBXTargetDependency */,
 			);
-			name = WritingBuddyTests;
-			productName = WritingBuddyTests;
-			productReference = WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */;
+			name = ContextDeskTests;
+			productName = ContextDeskTests;
+			productReference = WBPRODUCT0000000000000002 /* ContextDeskTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -313,7 +313,7 @@
 /* Begin PBXTargetDependency section */
 		WBDEPENDENCY000000000001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = WBTARGET000000000000000001 /* WritingBuddy */;
+			target = WBTARGET000000000000000001 /* ContextDesk */;
 			targetProxy = WBPROXY00000000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -324,7 +324,7 @@
 			containerPortal = WBPROJECT00000000000000001 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = WBTARGET000000000000000001;
-			remoteInfo = WritingBuddy;
+			remoteInfo = ContextDesk;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -345,7 +345,7 @@
 					};
 				};
 			};
-			buildConfigurationList = WBCFGLIST0000000000000001 /* Build configuration list for PBXProject "WritingBuddy" */;
+			buildConfigurationList = WBCFGLIST0000000000000001 /* Build configuration list for PBXProject "ContextDesk" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -361,8 +361,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				WBTARGET000000000000000001 /* WritingBuddy */,
-				WBTARGET000000000000000002 /* WritingBuddyTests */,
+				WBTARGET000000000000000001 /* ContextDesk */,
+				WBTARGET000000000000000002 /* ContextDeskTests */,
 			);
 		};
 /* End PBXProject section */
@@ -383,7 +383,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				WBBLD000000000000000001 /* WritingBuddyApp.swift in Sources */,
+				WBBLD000000000000000001 /* ContextDeskApp.swift in Sources */,
 				WBBLD000000000000000002 /* AppState.swift in Sources */,
 				WBBLD000000000000000003 /* Palette.swift in Sources */,
 				WBBLD000000000000000004 /* Layout.swift in Sources */,
@@ -575,8 +575,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WritingBuddy/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = WritingBuddy;
+				INFOPLIST_FILE = ContextDesk/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ContextDesk;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = "";
@@ -585,7 +585,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.writingbuddy.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -603,8 +603,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WritingBuddy/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = WritingBuddy;
+				INFOPLIST_FILE = ContextDesk/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ContextDesk;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = "";
@@ -613,7 +613,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.writingbuddy.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -629,12 +629,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.writingbuddy.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WritingBuddy.app/Contents/MacOS/WritingBuddy";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ContextDesk.app/Contents/MacOS/ContextDesk";
 			};
 			name = Debug;
 		};
@@ -647,19 +647,19 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.writingbuddy.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WritingBuddy.app/Contents/MacOS/WritingBuddy";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ContextDesk.app/Contents/MacOS/ContextDesk";
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		WBCFGLIST0000000000000001 /* Build configuration list for PBXProject "WritingBuddy" */ = {
+		WBCFGLIST0000000000000001 /* Build configuration list for PBXProject "ContextDesk" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				WBCFGPRJDEBUG000000000001 /* Debug */,
@@ -668,7 +668,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		WBCFGLIST0000000000000002 /* Build configuration list for PBXNativeTarget "WritingBuddy" */ = {
+		WBCFGLIST0000000000000002 /* Build configuration list for PBXNativeTarget "ContextDesk" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				WBCFGTGTDEBUG000000000001 /* Debug */,
@@ -677,7 +677,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		WBCFGLIST0000000000000003 /* Build configuration list for PBXNativeTarget "WritingBuddyTests" */ = {
+		WBCFGLIST0000000000000003 /* Build configuration list for PBXNativeTarget "ContextDeskTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				WBCFGTGTDEBUG000000000002 /* Debug */,

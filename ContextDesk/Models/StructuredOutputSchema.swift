@@ -6,7 +6,7 @@ struct StructuredOutput: Decodable {
 
 enum StructuredOutputSchema {
     static let toolName = "emit_output"
-    static let description = "Emit the Writing Buddy response as an ordered list of typed blocks."
+    static let description = "Emit the ContextDesk response as an ordered list of typed blocks."
     static let responseFormatName = "writing_buddy_output"
 
     static let schema: [String: Any] = [

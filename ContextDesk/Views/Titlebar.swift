@@ -10,7 +10,7 @@ struct Titlebar: View {
             palette.titlebarGradient
 
             // Centered title
-            Text("WritingBuddy")
+            Text("ContextDesk")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(palette.text)
                 .kerning(-0.1)

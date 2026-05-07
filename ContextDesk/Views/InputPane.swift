@@ -304,7 +304,7 @@ struct MessageView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 AssistantBadge(palette: palette)
-                Text("WritingBuddy")
+                Text("ContextDesk")
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundColor(palette.text)
                 Text("\u{00B7} \(timeLabel)")

@@ -177,18 +177,30 @@ struct RecentItem: Identifiable, Hashable, Codable {
     }()
 }
 
-private let historyLogger = Logger(subsystem: "com.writingbuddy.app", category: "history")
+private let historyLogger = Logger(subsystem: "com.contextdesk.app", category: "history")
 
 enum HistoryStore {
-    private static let userDefaultsKey = "WritingBuddy.history.v1"
+    private static let userDefaultsKeys = ["ContextDesk.history.v1", "WritingBuddy.history.v1"]
+    private static let appSupportDirectoryName = "com.contextdesk.app"
+    private static let legacyAppSupportDirectoryName = "com.writingbuddy.app"
     static let maxItems = 15
 
-    /// Overridable for tests. Defaults to `~/Library/Application Support/com.writingbuddy.app/history.json`.
+    /// Overridable for tests. Defaults to `~/Library/Application Support/com.contextdesk.app/history.json`.
     static var fileURL: URL = defaultFileURL()
+    /// Overridable for tests. Defaults to the pre-rename app-support file.
+    static var legacyFileURL: URL? = defaultLegacyFileURL()
     /// Overridable for tests. Defaults to `.standard`.
     static var defaults: UserDefaults = .standard
 
     private static func defaultFileURL() -> URL {
+        defaultFileURL(appSupportDirectoryName: appSupportDirectoryName)
+    }
+
+    private static func defaultLegacyFileURL() -> URL {
+        defaultFileURL(appSupportDirectoryName: legacyAppSupportDirectoryName)
+    }
+
+    private static func defaultFileURL(appSupportDirectoryName: String) -> URL {
         let base: URL
         do {
             base = try FileManager.default.url(
@@ -202,7 +214,7 @@ enum HistoryStore {
             base = URL(fileURLWithPath: NSTemporaryDirectory())
         }
         return base
-            .appendingPathComponent("com.writingbuddy.app", isDirectory: true)
+            .appendingPathComponent(appSupportDirectoryName, isDirectory: true)
             .appendingPathComponent("history.json")
     }
 
@@ -210,10 +222,11 @@ enum HistoryStore {
         let url = fileURL
         if FileManager.default.fileExists(atPath: url.path) {
             // Defensive: if a stale legacy blob is still around, drop it.
-            if defaults.data(forKey: userDefaultsKey) != nil {
-                defaults.removeObject(forKey: userDefaultsKey)
-            }
+            removeUserDefaultsBlobs()
             return decodeFile(at: url)
+        }
+        if let migrated = migrateFromLegacyFile() {
+            return migrated
         }
         return migrateFromUserDefaults()
     }
@@ -236,8 +249,24 @@ enum HistoryStore {
         }
     }
 
+    private static func migrateFromLegacyFile() -> [RecentItem]? {
+        guard let legacyURL = legacyFileURL,
+              legacyURL.path != fileURL.path,
+              FileManager.default.fileExists(atPath: legacyURL.path) else {
+            return nil
+        }
+        let items = decodeFile(at: legacyURL)
+        do {
+            try writeAtomically(items, to: fileURL)
+            historyLogger.info("Migrated \(items.count, privacy: .public) legacy history items from \(legacyURL.path, privacy: .public)")
+        } catch {
+            historyLogger.error("Migration write to \(fileURL.path, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        }
+        return items
+    }
+
     private static func migrateFromUserDefaults() -> [RecentItem] {
-        guard let data = defaults.data(forKey: userDefaultsKey) else { return [] }
+        guard let (key, data) = firstUserDefaultsBlob() else { return [] }
         let items: [RecentItem]
         do {
             items = try JSONDecoder().decode([RecentItem].self, from: data)
@@ -252,9 +281,24 @@ enum HistoryStore {
             historyLogger.error("Migration write to \(fileURL.path, privacy: .public) failed; leaving UserDefaults key intact: \(error.localizedDescription, privacy: .public)")
             return trimmed
         }
-        defaults.removeObject(forKey: userDefaultsKey)
+        defaults.removeObject(forKey: key)
         historyLogger.info("Migrated \(trimmed.count, privacy: .public) history items from UserDefaults to \(fileURL.path, privacy: .public)")
         return trimmed
+    }
+
+    private static func firstUserDefaultsBlob() -> (key: String, data: Data)? {
+        for key in userDefaultsKeys {
+            if let data = defaults.data(forKey: key) {
+                return (key, data)
+            }
+        }
+        return nil
+    }
+
+    private static func removeUserDefaultsBlobs() {
+        for key in userDefaultsKeys where defaults.data(forKey: key) != nil {
+            defaults.removeObject(forKey: key)
+        }
     }
 
     static func writeAtomically(_ items: [RecentItem], to url: URL) throws {

@@ -16,7 +16,7 @@ struct APIKeySetupSheet: View {
                 Text("\(provider.keyLabel) API key not found")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(palette.text)
-                Text("WritingBuddy looks for \(provider.shellAPIKeyLabel) in your shell profiles and inherited environment, then sends it only to \(provider.apiHost).")
+                Text("ContextDesk looks for \(provider.shellAPIKeyLabel) in your shell profiles and inherited environment, then sends it only to \(provider.apiHost).")
                     .font(.system(size: 12))
                     .foregroundColor(palette.muted)
                     .fixedSize(horizontal: false, vertical: true)

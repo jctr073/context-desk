@@ -1,5 +1,5 @@
 import XCTest
-@testable import WritingBuddy
+@testable import ContextDesk
 
 final class HistoryStoreTests: XCTestCase {
     private var tempDir: URL!
@@ -10,6 +10,7 @@ final class HistoryStoreTests: XCTestCase {
     private let legacyKey = "WritingBuddy.history.v1"
 
     private var savedFileURL: URL!
+    private var savedLegacyFileURL: URL?
     private var savedDefaults: UserDefaults!
 
     override func setUpWithError() throws {
@@ -24,13 +25,16 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertNotNil(defaults)
 
         savedFileURL = HistoryStore.fileURL
+        savedLegacyFileURL = HistoryStore.legacyFileURL
         savedDefaults = HistoryStore.defaults
         HistoryStore.fileURL = fileURL
+        HistoryStore.legacyFileURL = nil
         HistoryStore.defaults = defaults
     }
 
     override func tearDownWithError() throws {
         HistoryStore.fileURL = savedFileURL
+        HistoryStore.legacyFileURL = savedLegacyFileURL
         HistoryStore.defaults = savedDefaults
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         try? FileManager.default.removeItem(at: tempDir)

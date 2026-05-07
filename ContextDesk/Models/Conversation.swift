@@ -175,19 +175,31 @@ struct Conversation: Identifiable, Hashable, Codable {
     }()
 }
 
-private let conversationLogger = Logger(subsystem: "com.writingbuddy.app", category: "conversation")
+private let conversationLogger = Logger(subsystem: "com.contextdesk.app", category: "conversation")
 
 /// Disk-backed store for `Conversation`s. Mirrors `HistoryStore`.
 /// Migrates legacy `RecentItem` history into single-turn conversations on
 /// first load.
 enum ConversationStore {
+    private static let appSupportDirectoryName = "com.contextdesk.app"
+    private static let legacyAppSupportDirectoryName = "com.writingbuddy.app"
     static let maxItems = 50
 
     /// Overridable for tests. Defaults to
-    /// `~/Library/Application Support/com.writingbuddy.app/conversations.json`.
+    /// `~/Library/Application Support/com.contextdesk.app/conversations.json`.
     static var fileURL: URL = defaultFileURL()
+    /// Overridable for tests. Defaults to the pre-rename app-support file.
+    static var legacyFileURL: URL? = defaultLegacyFileURL()
 
     private static func defaultFileURL() -> URL {
+        defaultFileURL(appSupportDirectoryName: appSupportDirectoryName)
+    }
+
+    private static func defaultLegacyFileURL() -> URL {
+        defaultFileURL(appSupportDirectoryName: legacyAppSupportDirectoryName)
+    }
+
+    private static func defaultFileURL(appSupportDirectoryName: String) -> URL {
         let base: URL
         do {
             base = try FileManager.default.url(
@@ -201,13 +213,16 @@ enum ConversationStore {
             base = URL(fileURLWithPath: NSTemporaryDirectory())
         }
         return base
-            .appendingPathComponent("com.writingbuddy.app", isDirectory: true)
+            .appendingPathComponent(appSupportDirectoryName, isDirectory: true)
             .appendingPathComponent("conversations.json")
     }
 
     static func load() -> [Conversation] {
         if FileManager.default.fileExists(atPath: fileURL.path) {
             return decode(at: fileURL)
+        }
+        if let migrated = migrateFromLegacyFile() {
+            return migrated
         }
         return migrateFromHistory()
     }
@@ -228,6 +243,22 @@ enum ConversationStore {
             conversationLogger.error("Failed to read conversations file at \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return []
         }
+    }
+
+    private static func migrateFromLegacyFile() -> [Conversation]? {
+        guard let legacyURL = legacyFileURL,
+              legacyURL.path != fileURL.path,
+              FileManager.default.fileExists(atPath: legacyURL.path) else {
+            return nil
+        }
+        let conversations = decode(at: legacyURL)
+        do {
+            try writeAtomically(conversations, to: fileURL)
+            conversationLogger.info("Migrated \(conversations.count, privacy: .public) legacy conversations from \(legacyURL.path, privacy: .public)")
+        } catch {
+            conversationLogger.error("Migration write to \(fileURL.path, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        }
+        return conversations
     }
 
     /// One-time migration: turn each legacy `RecentItem` into a single-turn

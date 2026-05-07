@@ -1,5 +1,5 @@
 import XCTest
-@testable import WritingBuddy
+@testable import ContextDesk
 
 final class SSEEventStreamTests: XCTestCase {
     func testSingleNamedEvent() async throws {

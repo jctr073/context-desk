@@ -1,9 +1,9 @@
 #!/bin/zsh
 set -euo pipefail
 
-APP_NAME="WritingBuddy"
-PROJECT_FILE="WritingBuddy.xcodeproj"
-SCHEME="WritingBuddy"
+APP_NAME="ContextDesk"
+PROJECT_FILE="ContextDesk.xcodeproj"
+SCHEME="ContextDesk"
 CONFIGURATION="${CONFIGURATION:-Release}"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

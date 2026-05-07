@@ -21,6 +21,7 @@ struct ContentView: View {
 
             apiKeyOverlay(palette: palette)
             instructionsOverlay(palette: palette)
+            contextOverlay(palette: palette)
             lightboxOverlay(palette: palette)
         }
         .frame(minWidth: 900, minHeight: 580)
@@ -65,6 +66,22 @@ struct ContentView: View {
             }
         }
         .animation(.easeOut(duration: 0.12), value: state.editingInstructions)
+    }
+
+    @ViewBuilder
+    private func contextOverlay(palette: Palette) -> some View {
+        ZStack {
+            if state.editingContext {
+                palette.modalScrim
+                    .ignoresSafeArea()
+                    .onTapGesture { state.cancelEditingContext() }
+                    .transition(.opacity)
+
+                ContextSheet(state: state, palette: palette)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: state.editingContext)
     }
 
     @ViewBuilder

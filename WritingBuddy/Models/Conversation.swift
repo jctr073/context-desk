@@ -52,6 +52,8 @@ struct Conversation: Identifiable, Hashable, Codable {
     var title: String
     var mode: WritingMode
     var customInstructions: String
+    var contextText: String
+    var contextImages: [AttachedImage]
     var modelID: String
     var operationID: String
     var formats: Set<OutputFormat>
@@ -65,6 +67,8 @@ struct Conversation: Identifiable, Hashable, Codable {
         title: String = "New conversation",
         mode: WritingMode = .chat,
         customInstructions: String = "",
+        contextText: String = "",
+        contextImages: [AttachedImage] = [],
         modelID: String,
         operationID: String,
         formats: Set<OutputFormat> = [],
@@ -77,6 +81,8 @@ struct Conversation: Identifiable, Hashable, Codable {
         self.title = title
         self.mode = mode
         self.customInstructions = customInstructions
+        self.contextText = contextText
+        self.contextImages = contextImages
         self.modelID = modelID
         self.operationID = operationID
         self.formats = formats
@@ -84,6 +90,29 @@ struct Conversation: Identifiable, Hashable, Codable {
         self.messages = messages
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.title = try c.decode(String.self, forKey: .title)
+        self.mode = try c.decode(WritingMode.self, forKey: .mode)
+        self.customInstructions = try c.decode(String.self, forKey: .customInstructions)
+        self.contextText = (try? c.decode(String.self, forKey: .contextText)) ?? ""
+        self.contextImages = (try? c.decode([AttachedImage].self, forKey: .contextImages)) ?? []
+        self.modelID = try c.decode(String.self, forKey: .modelID)
+        self.operationID = try c.decode(String.self, forKey: .operationID)
+        self.formats = try c.decode(Set<OutputFormat>.self, forKey: .formats)
+        self.containerFormat = try c.decode(OutputContainerFormat.self, forKey: .containerFormat)
+        self.messages = try c.decode([ChatMessage].self, forKey: .messages)
+        self.createdAt = try c.decode(Date.self, forKey: .createdAt)
+        self.updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, mode, customInstructions, contextText, contextImages
+        case modelID, operationID, formats, containerFormat, messages
+        case createdAt, updatedAt
     }
 
     /// Indices of assistant messages in the order they appear — used to power

@@ -9,10 +9,14 @@ struct OutputCanvas: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            replyTabs
-            formatToolbar
-            content
-            footer
+            if state.canvasVisible {
+                replyTabs
+                formatToolbar
+                content
+                footer
+            } else {
+                Spacer(minLength: 0)
+            }
         }
         .background(palette.surfaceInset)
         .overlay(alignment: .leading) {
@@ -24,26 +28,38 @@ struct OutputCanvas: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: "rectangle.portrait.on.rectangle.portrait")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(palette.text)
-            Text("Output")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(palette.text)
-            Spacer()
-            IconButton(palette: palette, help: "Copy", action: { state.copyPinnedReply() }) {
-                Image(systemName: state.copiedFlash ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 11, weight: .medium))
+            Button(action: { state.toggleCanvasVisible() }) {
+                Image(systemName: "sidebar.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(palette.muted)
+                    .frame(width: 22, height: 22)
+                    .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
-            IconButton(palette: palette,
-                       isDisabled: state.running || state.pinnedReplyIdx == nil,
-                       help: "Regenerate",
-                       action: { state.regeneratePinnedReply() }) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .medium))
+            .buttonStyle(.plain)
+            .help(state.canvasVisible
+                  ? "Hide canvas (\u{2318}\u{2325}O)"
+                  : "Show canvas (\u{2318}\u{2325}O)")
+            .keyboardShortcut("o", modifiers: [.command, .option])
+
+            if state.canvasVisible {
+                Text("Output")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(palette.text)
+                Spacer()
+                IconButton(palette: palette, help: "Copy", action: { state.copyPinnedReply() }) {
+                    Image(systemName: state.copiedFlash ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                IconButton(palette: palette,
+                           isDisabled: state.running || state.pinnedReplyIdx == nil,
+                           help: "Regenerate",
+                           action: { state.regeneratePinnedReply() }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .medium))
+                }
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, state.canvasVisible ? 12 : 8)
         .padding(.vertical, 8)
         .frame(height: 44)
         .overlay(alignment: .bottom) {
@@ -206,19 +222,21 @@ private struct FormatChip: View {
     let palette: Palette
     let action: () -> Void
 
+    @State private var hovering = false
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            Group {
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
+                } else {
+                    Text(label)
+                        .font(.system(size: 11, weight: .medium))
                 }
-                Text(label)
-                    .font(.system(size: 11, weight: .medium))
             }
             .foregroundColor(isActive ? palette.chipActiveText : palette.muted)
-            .padding(.horizontal, 8)
-            .frame(height: 24)
+            .frame(width: 24, height: 24)
             .background(
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .fill(isActive ? palette.chipActive : Color.clear)
@@ -230,5 +248,7 @@ private struct FormatChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(label)
     }
 }

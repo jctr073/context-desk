@@ -9,7 +9,7 @@ enum WritingMode: String, CaseIterable, Identifiable, Hashable, Codable {
     var label: String {
         switch self {
         case .writing: return "Writing"
-        case .chat:    return "Chat & Tasks"
+        case .chat:    return "Chat"
         }
     }
 

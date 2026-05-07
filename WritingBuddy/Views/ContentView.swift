@@ -90,23 +90,31 @@ struct ContentView: View {
             GeometryReader { geo in
                 let total = geo.size.width
                 HStack(spacing: 0) {
-                    ChatPane(state: state, palette: palette)
-                        .frame(width: max(0, total * state.canvasSplit))
-                    DraggableDivider(
-                        isStacked: false,
-                        totalSize: total,
-                        fraction: $state.canvasSplit,
-                        palette: palette,
-                        minFraction: 0.45,
-                        maxFraction: 0.85
-                    )
-                    OutputCanvas(state: state, palette: palette)
-                        .frame(maxWidth: .infinity)
+                    if state.canvasVisible {
+                        ChatPane(state: state, palette: palette)
+                            .frame(width: max(0, total * state.canvasSplit))
+                        DraggableDivider(
+                            isStacked: false,
+                            totalSize: total,
+                            fraction: $state.canvasSplit,
+                            palette: palette,
+                            minFraction: 0.45,
+                            maxFraction: 0.85
+                        )
+                        OutputCanvas(state: state, palette: palette)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        ChatPane(state: state, palette: palette)
+                            .frame(maxWidth: .infinity)
+                        OutputCanvas(state: state, palette: palette)
+                            .frame(width: 38)
+                    }
                 }
                 .coordinateSpace(name: "panes")
             }
         }
         .animation(.easeInOut(duration: 0.22), value: state.historyVisible)
+        .animation(.easeInOut(duration: 0.22), value: state.canvasVisible)
     }
 }
 

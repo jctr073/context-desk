@@ -21,7 +21,7 @@ struct ActionDropdown: View {
 
     var body: some View {
         Menu {
-            Section(mode == .writing ? "Writing actions" : "Chat & task actions") {
+            Section(mode == .writing ? "Writing actions" : "Chat actions") {
                 switch mode {
                 case .writing:
                     ForEach(WritingOp.allCases) { op in
@@ -52,25 +52,24 @@ struct ActionDropdown: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .semibold))
                 Text(current.label)
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 13, weight: .semibold))
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .bold))
-                    .opacity(0.8)
+                    .opacity(0.7)
                     .padding(.leading, 1)
             }
-            .foregroundColor(.white)
-            .padding(.horizontal, 14)
-            .frame(height: 32)
+            .foregroundColor(palette.text)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(palette.accent)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(palette.chip)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(palette.chipBorder, lineWidth: 1)
             )
-            .shadow(color: palette.accent.opacity(0.25), radius: 4, y: 1)
-            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .menuStyle(.button)
         .buttonStyle(.plain)

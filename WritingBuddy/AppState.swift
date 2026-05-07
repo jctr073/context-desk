@@ -51,6 +51,7 @@ final class AppState: ObservableObject {
     @Published var model: AIModel = .gpt55Medium
     @Published var theme: AppTheme = .dark
     @Published var historyVisible: Bool = true
+    @Published var canvasVisible: Bool = true
     @Published var canvasSplit: Double = 0.66
     @Published var configuredProviders: Set<AIProvider> = []
     @Published var addingKeyFor: AIProvider? = nil
@@ -87,6 +88,15 @@ final class AppState: ObservableObject {
               let msgs = activeConversation?.messages,
               msgs.indices.contains(idx) else { return nil }
         return msgs[idx]
+    }
+
+    var composerPromptHistory: [String] {
+        guard let messages = activeConversation?.messages else { return [] }
+        return messages.reversed().compactMap { message in
+            guard message.role == .user else { return nil }
+            guard !message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return message.text
+        }
     }
 
     // MARK: - API key helpers
@@ -171,6 +181,7 @@ final class AppState: ObservableObject {
     // MARK: - Conversation lifecycle
 
     func toggleHistoryVisible() { historyVisible.toggle() }
+    func toggleCanvasVisible() { canvasVisible.toggle() }
 
     func newConversation() {
         runTask?.cancel()

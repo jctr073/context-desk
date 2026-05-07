@@ -3,6 +3,7 @@ import SwiftUI
 struct HistorySidebar: View {
     @ObservedObject var state: AppState
     let palette: Palette
+    @State private var confirmingClear = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,6 +36,16 @@ struct HistorySidebar: View {
         .overlay(alignment: .trailing) {
             Rectangle().fill(palette.border).frame(width: 1)
         }
+        .confirmationDialog(
+            "Clear all history?",
+            isPresented: $confirmingClear,
+            titleVisibility: .visible
+        ) {
+            Button("Clear History", role: .destructive) { state.clearHistory() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes all \(state.history.count) recent items. This cannot be undone.")
+        }
     }
 
     private var header: some View {
@@ -58,6 +69,24 @@ struct HistorySidebar: View {
                     .tracking(0.6)
                     .foregroundColor(palette.muted)
                 Spacer()
+                Menu {
+                    Button(role: .destructive) {
+                        confirmingClear = true
+                    } label: {
+                        Label("Clear History\u{2026}", systemImage: "trash")
+                    }
+                    .disabled(state.history.isEmpty)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(palette.muted)
+                        .frame(width: 22, height: 22)
+                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 22, height: 22)
+                .help("More")
                 Button(action: { state.newSession() }) {
                     Image(systemName: "plus")
                         .font(.system(size: 10, weight: .medium))

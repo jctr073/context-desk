@@ -424,6 +424,12 @@ final class AppState: ObservableObject {
         activeRecentID = nil
     }
 
+    func clearHistory() {
+        history = []
+        HistoryStore.save(history)
+        activeRecentID = nil
+    }
+
     func startEditingInstructions() {
         editingInstructions = true
     }

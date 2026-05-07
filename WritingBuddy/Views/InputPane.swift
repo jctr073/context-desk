@@ -487,6 +487,7 @@ struct ChatComposer: View {
                 placeholder: state.mode == .writing
                     ? "Describe what you want to write\u{2026}"
                     : "Ask a follow-up, or paste something to chew on\u{2026}",
+                promptHistoryEntries: state.composerPromptHistory,
                 onSubmit: { state.send() },
                 onPasteImages: { state.attachImages($0) }
             )
@@ -717,6 +718,7 @@ struct ComposerEditor: NSViewRepresentable {
     @Binding var text: String
     let palette: Palette
     let placeholder: String
+    let promptHistoryEntries: [String]
     let onSubmit: () -> Void
     let onPasteImages: ([AttachedImage]) -> Void
 
@@ -726,6 +728,10 @@ struct ComposerEditor: NSViewRepresentable {
         tv.delegate = context.coordinator
         tv.onSubmit = onSubmit
         tv.onPasteImages = onPasteImages
+        let coordinator = context.coordinator
+        tv.onProgrammaticTextChange = { newText in
+            coordinator.parent.text = newText
+        }
         tv.isRichText = false
         tv.isAutomaticQuoteSubstitutionEnabled = false
         tv.isAutomaticDashSubstitutionEnabled = false
@@ -742,6 +748,7 @@ struct ComposerEditor: NSViewRepresentable {
         applyColors(tv, palette: palette)
         tv.string = text
         tv.placeholder = placeholder
+        tv.setPromptHistoryEntries(promptHistoryEntries)
         return scroll
     }
 
@@ -750,11 +757,19 @@ struct ComposerEditor: NSViewRepresentable {
         let tv = scroll.documentView as! ChatComposerTextView
         tv.onSubmit = onSubmit
         tv.onPasteImages = onPasteImages
+        let coordinator = context.coordinator
+        tv.onProgrammaticTextChange = { newText in
+            coordinator.parent.text = newText
+        }
         tv.placeholder = placeholder
+        tv.setPromptHistoryEntries(promptHistoryEntries)
         if tv.string != text {
             tv.string = text
+            tv.resetPromptHistoryNavigation()
+            tv.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
         }
         applyColors(tv, palette: palette)
+        tv.updatePlaceholderVisibility()
     }
 
     private func applyColors(_ tv: NSTextView, palette: Palette) {
@@ -770,14 +785,26 @@ struct ComposerEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
             parent.text = tv.string
-            (tv as? ChatComposerTextView)?.updatePlaceholderVisibility()
+            if let composer = tv as? ChatComposerTextView {
+                composer.handleTextDidChange()
+            }
         }
     }
 }
 
 private final class ChatComposerTextView: NSTextView {
+    private enum PromptHistoryDirection {
+        case older
+        case newer
+    }
+
     var onSubmit: (() -> Void)?
     var onPasteImages: (([AttachedImage]) -> Void)?
+    var onProgrammaticTextChange: ((String) -> Void)?
+    private var promptHistoryEntries: [String] = []
+    private var promptHistoryIndex: Int?
+    private var draftBeforePromptHistory: String = ""
+    private var isApplyingPromptHistoryEntry = false
     var placeholder: String = "" {
         didSet { needsDisplay = true }
     }
@@ -793,7 +820,79 @@ private final class ChatComposerTextView: NSTextView {
             onSubmit?()
             return
         }
+        if event.keyCode == 126 { // up arrow
+            if navigatePromptHistory(.older, event: event) { return }
+        }
+        if event.keyCode == 125 { // down arrow
+            if navigatePromptHistory(.newer, event: event) { return }
+        }
         super.keyDown(with: event)
+    }
+
+    func setPromptHistoryEntries(_ entries: [String]) {
+        guard entries != promptHistoryEntries else { return }
+        promptHistoryEntries = entries
+        resetPromptHistoryNavigation()
+    }
+
+    func resetPromptHistoryNavigation() {
+        promptHistoryIndex = nil
+        draftBeforePromptHistory = ""
+    }
+
+    func handleTextDidChange() {
+        if !isApplyingPromptHistoryEntry {
+            resetPromptHistoryNavigation()
+        }
+        updatePlaceholderVisibility()
+    }
+
+    private func navigatePromptHistory(_ direction: PromptHistoryDirection, event: NSEvent) -> Bool {
+        let disallowedModifiers: NSEvent.ModifierFlags = [.command, .option, .control, .shift]
+        guard event.modifierFlags.intersection(disallowedModifiers).isEmpty else { return false }
+        guard !promptHistoryEntries.isEmpty else { return false }
+
+        switch direction {
+        case .older:
+            if let index = promptHistoryIndex {
+                promptHistoryIndex = (index + 1) % promptHistoryEntries.count
+            } else {
+                guard canStartPromptHistoryNavigation else { return false }
+                draftBeforePromptHistory = string
+                promptHistoryIndex = 0
+            }
+        case .newer:
+            guard let index = promptHistoryIndex else { return false }
+            if index == 0 {
+                promptHistoryIndex = nil
+                replaceComposerText(draftBeforePromptHistory)
+                draftBeforePromptHistory = ""
+                return true
+            }
+            promptHistoryIndex = index - 1
+        }
+
+        guard let index = promptHistoryIndex,
+              promptHistoryEntries.indices.contains(index) else { return false }
+        replaceComposerText(promptHistoryEntries[index])
+        return true
+    }
+
+    private var canStartPromptHistoryNavigation: Bool {
+        if string.isEmpty { return true }
+        let selection = selectedRange()
+        guard selection.length == 0 else { return false }
+        if !string.contains("\n") { return true }
+        return selection.location == 0
+    }
+
+    private func replaceComposerText(_ newText: String) {
+        isApplyingPromptHistoryEntry = true
+        string = newText
+        isApplyingPromptHistoryEntry = false
+        setSelectedRange(NSRange(location: (newText as NSString).length, length: 0))
+        updatePlaceholderVisibility()
+        onProgrammaticTextChange?(newText)
     }
 
     override func paste(_ sender: Any?) {

@@ -27,12 +27,12 @@ struct ModePill: View {
                 .shadow(color: Color.black.opacity(0.06), radius: 1, y: 1)
                 .frame(width: Self.segmentWidth - 4, height: 22)
                 .padding(2)
-                .offset(x: mode == .writing ? 0 : Self.segmentWidth)
+                .offset(x: mode == .chat ? 0 : Self.segmentWidth)
                 .animation(.spring(response: 0.32, dampingFraction: 0.85), value: mode)
 
             HStack(spacing: 0) {
-                segmentButton(.writing)
                 segmentButton(.chat)
+                segmentButton(.writing)
             }
         }
         .frame(width: Self.segmentWidth * 2, height: 26)

@@ -1,58 +1,95 @@
 import SwiftUI
 
-enum InputTab: String, CaseIterable, Identifiable, Hashable {
-    case input
-    case context
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .input:   return "Input"
-        case .context: return "Context"
-        }
-    }
-}
-
 @MainActor
 final class AppState: ObservableObject {
-    @Published var input: String = ""
-    @Published var context: String = ""
-    @Published var customInstructions: String = ""
-    @Published var inputTab: InputTab = .input
-    @Published var editingInstructions: Bool = false
-    @Published var ops: Set<WritingOp> = [.cleanup]
-    @Published var chatOp: ChatOp = .ask
-    @Published var mode: WritingMode = .writing
-    @Published var fmts: Set<OutputFormat> = []
-    @Published var containerFormat: OutputContainerFormat = .markdown
-    @Published var output: [OutputBlock]? = nil
-    @Published var running: Bool = false
-    @Published var diffMode: Bool = false
-    @Published var renderMode: RenderMode = .rendered
-    @Published var activeRecentID: String? = nil
-    @Published var history: [RecentItem] = []
-    @Published var model: AIModel = .gpt55Medium
-    @Published var theme: AppTheme = .light
-    @Published var layout: PaneLayout = .stacked
-    @Published var copiedFlash: Bool = false
-    @Published var configuredProviders: Set<AIProvider> = []
-    @Published var addingKeyFor: AIProvider? = nil
-    @Published var historyVisible: Bool = true
-    @Published var inputImages: [AttachedImage] = []
-    @Published var contextImages: [AttachedImage] = []
-    @Published var lightboxImage: AttachedImage? = nil
-    /// ID of the most-recently-added image, used to drive the bounce/flash animation.
+    // MARK: Conversations
+    @Published var conversations: [Conversation] = []
+    @Published var activeConversationID: String? = nil
+
+    // MARK: Composer / draft
+    @Published var draft: String = ""
+    @Published var draftImages: [AttachedImage] = []
     @Published var lastAddedImageID: String? = nil
     @Published var pasteFlash: Bool = false
+    @Published var lightboxImage: AttachedImage? = nil
+
+    // MARK: Output canvas
+    /// Index of the assistant message currently shown in the right output canvas.
+    @Published var pinnedReplyIdx: Int? = nil
+    /// When true, the canvas auto-advances to the freshest assistant reply on send.
+    @Published var autoFollowLatest: Bool = true
+    @Published var renderMode: RenderMode = .rendered
+    @Published var copiedFlash: Bool = false
+
+    // MARK: Mode + operation (per-conversation, mirrored here for the toolbar)
+    @Published var mode: WritingMode = .chat {
+        didSet { syncActiveConversationMeta() }
+    }
+    @Published var ops: Set<WritingOp> = [.cleanup] {
+        didSet { syncActiveConversationMeta() }
+    }
+    @Published var chatOp: ChatOp = .ask {
+        didSet { syncActiveConversationMeta() }
+    }
+    @Published var fmts: Set<OutputFormat> = [] {
+        didSet { syncActiveConversationMeta() }
+    }
+    @Published var containerFormat: OutputContainerFormat = .markdown {
+        didSet { syncActiveConversationMeta() }
+    }
+    @Published var customInstructions: String = "" {
+        didSet { syncActiveConversationMeta() }
+    }
+    @Published var editingInstructions: Bool = false
+
+    // MARK: Run state
+    @Published var running: Bool = false
+    /// While streaming, the assistant message at this index is being filled in.
+    @Published var streamingMessageIndex: Int? = nil
+
+    // MARK: Global app chrome
+    @Published var model: AIModel = .gpt55Medium
+    @Published var theme: AppTheme = .dark
+    @Published var historyVisible: Bool = true
+    @Published var canvasSplit: Double = 0.66
+    @Published var configuredProviders: Set<AIProvider> = []
+    @Published var addingKeyFor: AIProvider? = nil
 
     private var runTask: Task<Void, Never>?
     private var pasteFlashTask: Task<Void, Never>?
+    private var suppressMetaSync = false
 
     init() {
         self.configuredProviders = Self.configuredProviderSet()
-        self.history = HistoryStore.load()
+        self.conversations = ConversationStore.load()
+        if let first = self.conversations.first {
+            adoptConversation(first.id)
+        }
     }
+
+    // MARK: - Active conversation accessors
+
+    var activeConversation: Conversation? {
+        guard let id = activeConversationID else { return nil }
+        return conversations.first(where: { $0.id == id })
+    }
+
+    var activeMessages: [ChatMessage] {
+        activeConversation?.messages ?? []
+    }
+
+    var assistantIndices: [Int] {
+        activeConversation?.assistantIndices ?? []
+    }
+
+    var pinnedMessage: ChatMessage? {
+        guard let idx = pinnedReplyIdx,
+              let msgs = activeConversation?.messages,
+              msgs.indices.contains(idx) else { return nil }
+        return msgs[idx]
+    }
+
+    // MARK: - API key helpers
 
     func hasKey(for provider: AIProvider) -> Bool {
         configuredProviders.contains(provider) || APIKeyStore.exists(for: provider)
@@ -66,60 +103,36 @@ final class AppState: ObservableObject {
         addingKeyFor = nil
     }
 
-    var canRun: Bool {
-        let hasInputText = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hasInputImages = !inputImages.isEmpty
-        let canUseImageOnlyInput = AIWritingService.supports(model.provider)
-        let hasOperation = mode == .chat || !(ops.isEmpty && fmts.isEmpty)
-        return (hasInputText || (hasInputImages && canUseImageOnlyInput))
-            && hasOperation
-            && !running
+    private static func configuredProviderSet() -> Set<AIProvider> {
+        Set(AIProvider.allCases.filter { APIKeyStore.exists(for: $0) })
     }
 
-    var currentTabImages: [AttachedImage] {
-        inputTab == .input ? inputImages : contextImages
+    // MARK: - Composer state
+
+    var canSend: Bool {
+        let hasText = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasImages = !draftImages.isEmpty && AIWritingService.supports(model.provider)
+        return (hasText || hasImages) && !running
     }
 
-    var currentTabImageCount: Int {
-        currentTabImages.count
-    }
-
-    func attachImage(_ image: AttachedImage, to tab: InputTab) {
-        switch tab {
-        case .input:   inputImages.append(image)
-        case .context: contextImages.append(image)
-        }
-        lastAddedImageID = image.id
-        triggerPasteFlash()
-    }
-
-    func attachImages(_ images: [AttachedImage], to tab: InputTab) {
+    func attachImages(_ images: [AttachedImage]) {
         guard !images.isEmpty else { return }
-        switch tab {
-        case .input:   inputImages.append(contentsOf: images)
-        case .context: contextImages.append(contentsOf: images)
-        }
+        draftImages.append(contentsOf: images)
         lastAddedImageID = images.last?.id
         triggerPasteFlash()
     }
 
-    func removeImage(_ image: AttachedImage, from tab: InputTab) {
-        switch tab {
-        case .input:   inputImages.removeAll { $0.id == image.id }
-        case .context: contextImages.removeAll { $0.id == image.id }
-        }
-        if lastAddedImageID == image.id {
-            lastAddedImageID = nil
-        }
+    func attachImage(_ image: AttachedImage) {
+        attachImages([image])
     }
 
-    func showLightbox(_ image: AttachedImage) {
-        lightboxImage = image
+    func removeImage(_ image: AttachedImage) {
+        draftImages.removeAll { $0.id == image.id }
+        if lastAddedImageID == image.id { lastAddedImageID = nil }
     }
 
-    func dismissLightbox() {
-        lightboxImage = nil
-    }
+    func showLightbox(_ image: AttachedImage) { lightboxImage = image }
+    func dismissLightbox() { lightboxImage = nil }
 
     private func triggerPasteFlash() {
         pasteFlash = true
@@ -130,39 +143,16 @@ final class AppState: ObservableObject {
         }
     }
 
-    var wordCount: Int {
-        let source = inputTab == .input ? input : context
-        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return 0 }
-        return trimmed.split { $0.isWhitespace }.count
-    }
+    // MARK: - Operation routing
 
-    var outputWordCount: Int {
-        guard let blocks = output else { return 0 }
-        let trimmed = MockGenerator.plainText(from: blocks)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return 0 }
-        return trimmed.split { $0.isWhitespace }.count
-    }
-
-    var hasCustomInstructions: Bool {
-        !customInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    func toggleOp(_ op: WritingOp) {
-        ops = [op]
-    }
-
-    func setChatOp(_ op: ChatOp) {
-        chatOp = op
-    }
+    func toggleOp(_ op: WritingOp) { ops = [op] }
+    func setChatOp(_ op: ChatOp) { chatOp = op }
 
     func setMode(_ newMode: WritingMode) {
         guard mode != newMode else { return }
         mode = newMode
     }
 
-    /// The currently selected operation for the active mode.
     var activeOperation: Operation {
         switch mode {
         case .writing:
@@ -172,335 +162,318 @@ final class AppState: ObservableObject {
         }
     }
 
-    func toggleHistoryVisible() {
-        historyVisible.toggle()
-    }
-
     var isAutomaticFormat: Bool { fmts.isEmpty }
-
-    func setAutomaticFormat() {
-        fmts.removeAll()
-    }
-
+    func setAutomaticFormat() { fmts.removeAll() }
     func toggleFormat(_ fmt: OutputFormat) {
-        if fmts.contains(fmt) {
-            fmts.remove(fmt)
-        } else {
-            fmts.insert(fmt)
-        }
+        if fmts.contains(fmt) { fmts.remove(fmt) } else { fmts.insert(fmt) }
     }
 
-    func run() {
-        guard canRun else { return }
-        runTask?.cancel()
-        let snapshotInput = input
-        let snapshotContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
-        let snapshotInstructions = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
-        let snapshotInputImages = inputImages
-        let snapshotContextImages = contextImages
-        let snapshotMode = mode
-        let snapshotFmts = fmts
-        let snapshotContainerFormat = containerFormat
-        let snapshotModel = model
-        let snapshotOp: Operation = activeOperation
+    // MARK: - Conversation lifecycle
 
-        if AIWritingService.supports(snapshotModel.provider) {
-            let provider = snapshotModel.provider
-            configuredProviders = Self.configuredProviderSet()
+    func toggleHistoryVisible() { historyVisible.toggle() }
 
-            guard let apiKey = APIKeyStore.read(for: provider) else {
-                startAddingKey(provider)
-                return
-            }
-            runAISubmit(
-                input: snapshotInput,
-                context: snapshotContext,
-                customInstructions: snapshotInstructions,
-                inputImages: snapshotInputImages,
-                contextImages: snapshotContextImages,
-                operation: snapshotOp,
-                mode: snapshotMode,
-                formats: snapshotFmts,
-                containerFormat: snapshotContainerFormat,
-                model: snapshotModel,
-                apiKey: apiKey
-            )
-            return
-        }
-
-        running = true
-        output = nil
-        runTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 650_000_000) // 650ms — matches prototype
-            guard !Task.isCancelled, let self else { return }
-            let result = MockGenerator.generate(
-                input: snapshotInput,
-                operation: snapshotOp,
-                mode: snapshotMode,
-                fmts: snapshotFmts,
-                containerFormat: snapshotContainerFormat,
-                model: snapshotModel
-            )
-            await MainActor.run {
-                self.finishRun(
-                    input: snapshotInput,
-                    context: snapshotContext,
-                    inputImages: snapshotInputImages,
-                    contextImages: snapshotContextImages,
-                    operation: snapshotOp,
-                    mode: snapshotMode,
-                    formats: snapshotFmts,
-                    containerFormat: snapshotContainerFormat,
-                    model: snapshotModel,
-                    output: result
-                )
-            }
-        }
-    }
-
-    private static func configuredProviderSet() -> Set<AIProvider> {
-        Set(AIProvider.allCases.filter { APIKeyStore.exists(for: $0) })
-    }
-
-    private func runAISubmit(
-        input: String,
-        context: String,
-        customInstructions: String,
-        inputImages: [AttachedImage],
-        contextImages: [AttachedImage],
-        operation: Operation,
-        mode: WritingMode,
-        formats: Set<OutputFormat>,
-        containerFormat: OutputContainerFormat,
-        model: AIModel,
-        apiKey: String
-    ) {
-        running = true
-        output = nil
-        runTask = Task { [weak self] in
-            do {
-                let stream = AIWritingService.submitStream(
-                    input: input,
-                    context: context,
-                    customInstructions: customInstructions,
-                    inputImages: inputImages,
-                    contextImages: contextImages,
-                    operation: operation,
-                    model: model,
-                    apiKey: apiKey
-                )
-                for try await snapshot in stream {
-                    if Task.isCancelled { return }
-                    await MainActor.run { self?.output = snapshot }
-                }
-                guard !Task.isCancelled, let self else { return }
-                await MainActor.run {
-                    self.finishRun(
-                        input: input,
-                        context: context,
-                        inputImages: inputImages,
-                        contextImages: contextImages,
-                        operation: operation,
-                        mode: mode,
-                        formats: formats,
-                        containerFormat: containerFormat,
-                        model: model,
-                        output: self.output ?? []
-                    )
-                }
-            } catch {
-                guard !Task.isCancelled, let self else { return }
-                await MainActor.run {
-                    let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                    self.output = [
-                        .heading(text: "\(model.provider.keyLabel) request failed"),
-                        .paragraph(text: detail),
-                    ]
-                    self.running = false
-                }
-            }
-        }
-    }
-
-    private func finishRun(
-        input: String,
-        context: String,
-        inputImages: [AttachedImage],
-        contextImages: [AttachedImage],
-        operation: Operation,
-        mode: WritingMode,
-        formats: Set<OutputFormat>,
-        containerFormat: OutputContainerFormat,
-        model: AIModel,
-        output blocks: [OutputBlock]
-    ) {
-        output = blocks
-        running = false
-        addHistoryItem(
-            input: input,
-            context: context,
-            inputImages: inputImages,
-            contextImages: contextImages,
-            output: blocks,
-            operation: operation,
-            mode: mode,
-            formats: formats,
-            containerFormat: containerFormat,
-            model: model
-        )
-    }
-
-    private func addHistoryItem(
-        input: String,
-        context: String,
-        inputImages: [AttachedImage],
-        contextImages: [AttachedImage],
-        output: [OutputBlock],
-        operation: Operation,
-        mode: WritingMode,
-        formats: Set<OutputFormat>,
-        containerFormat: OutputContainerFormat,
-        model: AIModel
-    ) {
-        let item = RecentItem(
-            input: input,
-            context: context,
-            inputImages: inputImages,
-            contextImages: contextImages,
-            output: output,
-            operationID: operation.id,
-            operationLabel: operation.label,
-            mode: mode,
-            formats: formats,
-            containerFormat: containerFormat,
-            modelID: model.id
-        )
-        history.removeAll { $0.id == item.id }
-        history.insert(item, at: 0)
-        history = Array(history.prefix(HistoryStore.maxItems))
-        HistoryStore.save(history)
-        activeRecentID = item.id
-    }
-
-    func selectHistoryItem(_ item: RecentItem) {
+    func newConversation() {
         runTask?.cancel()
         running = false
-        input = item.input
-        context = item.context
-        inputImages = item.inputImages
-        contextImages = item.contextImages
-        inputTab = .input
-        output = item.output
-        mode = item.mode
-        switch item.mode {
+        let convo = Conversation(
+            modelID: model.id,
+            operationID: activeOperation.id,
+            formats: fmts,
+            containerFormat: containerFormat
+        )
+        conversations.insert(convo, at: 0)
+        ConversationStore.save(conversations)
+        adoptConversation(convo.id)
+    }
+
+    func selectConversation(_ id: String) {
+        guard id != activeConversationID else { return }
+        runTask?.cancel()
+        running = false
+        adoptConversation(id)
+    }
+
+    /// Reset all UI state to the conversation with the given id, syncing
+    /// mode/op/format/instructions back to the published toolbar fields.
+    private func adoptConversation(_ id: String) {
+        guard let convo = conversations.first(where: { $0.id == id }) else { return }
+        suppressMetaSync = true
+        activeConversationID = id
+        mode = convo.mode
+        switch convo.mode {
         case .writing:
-            if let op = WritingOp(rawValue: item.operationID) {
-                ops = [op]
-            } else {
-                ops = [.cleanup]
-            }
+            ops = [WritingOp(rawValue: convo.operationID) ?? .cleanup]
         case .chat:
-            chatOp = ChatOp(rawValue: item.operationID) ?? .ask
+            chatOp = ChatOp(rawValue: convo.operationID) ?? .ask
         }
-        fmts = item.formats
-        containerFormat = item.containerFormat
-        if let restoredModel = AIModel.model(withID: item.modelID) {
-            model = restoredModel
-        }
-        activeRecentID = item.id
-    }
-
-    func newSession() {
-        runTask?.cancel()
-        running = false
-        input = ""
-        context = ""
-        customInstructions = ""
-        inputImages = []
-        contextImages = []
+        fmts = convo.formats
+        containerFormat = convo.containerFormat
+        customInstructions = convo.customInstructions
+        if let m = AIModel.model(withID: convo.modelID) { model = m }
+        draft = ""
+        draftImages = []
         lastAddedImageID = nil
-        inputTab = .input
-        output = nil
-        activeRecentID = nil
+        pinnedReplyIdx = convo.latestAssistantIndex
+        autoFollowLatest = true
+        suppressMetaSync = false
     }
 
-    func clearHistory() {
-        history = []
-        HistoryStore.save(history)
-        activeRecentID = nil
+    func deleteConversation(_ id: String) {
+        conversations.removeAll { $0.id == id }
+        ConversationStore.save(conversations)
+        if activeConversationID == id {
+            if let next = conversations.first {
+                adoptConversation(next.id)
+            } else {
+                activeConversationID = nil
+                pinnedReplyIdx = nil
+                draft = ""
+                draftImages = []
+            }
+        }
     }
 
-    func startEditingInstructions() {
-        editingInstructions = true
+    func clearAllConversations() {
+        conversations = []
+        activeConversationID = nil
+        pinnedReplyIdx = nil
+        draft = ""
+        draftImages = []
+        ConversationStore.save([])
     }
 
-    func cancelEditingInstructions() {
-        editingInstructions = false
-    }
-
+    func startEditingInstructions() { editingInstructions = true }
+    func cancelEditingInstructions() { editingInstructions = false }
     func saveCustomInstructions(_ text: String) {
         customInstructions = text
         editingInstructions = false
     }
 
-    func importSelectedTextFromActiveApp(to targetTab: InputTab = .input) {
-        Task { [weak self] in
-            let result = await SelectedTextCapture.capture()
+    var hasCustomInstructions: Bool {
+        !customInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
-            await MainActor.run {
-                guard let self else { return }
-                NSApp.activate(ignoringOtherApps: true)
+    /// Mirror toolbar/composer state back into the active conversation, so
+    /// edits are picked up by the next save.
+    private func syncActiveConversationMeta() {
+        guard !suppressMetaSync, let id = activeConversationID,
+              let idx = conversations.firstIndex(where: { $0.id == id }) else { return }
+        var convo = conversations[idx]
+        convo.mode = mode
+        convo.operationID = activeOperation.id
+        convo.formats = fmts
+        convo.containerFormat = containerFormat
+        convo.customInstructions = customInstructions
+        convo.modelID = model.id
+        conversations[idx] = convo
+    }
 
-                switch result {
-                case .success(let text):
-                    self.runTask?.cancel()
-                    self.running = false
-                    self.applyImportedSelectedText(text, to: targetTab)
-                    self.output = nil
-                    self.activeRecentID = nil
+    func selectPinnedReply(_ idx: Int) {
+        guard let assistantIdxs = activeConversation?.assistantIndices,
+              !assistantIdxs.isEmpty else { return }
+        pinnedReplyIdx = idx
+        autoFollowLatest = (idx == assistantIdxs.last)
+    }
 
-                case .accessibilityPermissionNeeded:
-                    self.running = false
-                    self.output = [
-                        .paragraph(text: "WritingBuddy needs Accessibility permission to copy selected text from other apps. Enable it in System Settings, then try Control-A or Control-Q again.")
-                    ]
+    // MARK: - Sending
 
-                case .noText:
-                    self.running = false
-                    self.output = [
-                        .paragraph(text: "No selected text was available to import.")
-                    ]
+    func send() {
+        guard canSend else { return }
+        let trimmedDraft = draft
+        let images = draftImages
+
+        if conversations.isEmpty || activeConversationID == nil {
+            newConversation()
+        }
+        guard let convoIdx = conversations.firstIndex(where: { $0.id == activeConversationID }) else { return }
+
+        let userMessage = ChatMessage(
+            role: .user,
+            text: trimmedDraft,
+            attachments: images
+        )
+        var convo = conversations[convoIdx]
+        convo.messages.append(userMessage)
+        if convo.title == "New conversation" || convo.messages.count == 1 {
+            convo.title = Conversation.deriveTitle(from: trimmedDraft.isEmpty ? "Image input" : trimmedDraft)
+        }
+        convo.updatedAt = Date()
+        conversations[convoIdx] = convo
+        moveActiveToTop()
+
+        draft = ""
+        draftImages = []
+
+        // Append placeholder assistant message that streaming will populate.
+        let assistantMessage = ChatMessage(role: .assistant, text: "", blocks: [])
+        guard let convoIdx2 = conversations.firstIndex(where: { $0.id == activeConversationID }) else { return }
+        conversations[convoIdx2].messages.append(assistantMessage)
+        let assistantIdx = conversations[convoIdx2].messages.count - 1
+        streamingMessageIndex = assistantIdx
+        if autoFollowLatest { pinnedReplyIdx = assistantIdx }
+
+        if AIWritingService.supports(model.provider) {
+            guard let apiKey = APIKeyStore.read(for: model.provider) else {
+                streamingMessageIndex = nil
+                conversations[convoIdx2].messages.removeLast()
+                startAddingKey(model.provider)
+                return
+            }
+            startLiveStream(apiKey: apiKey, assistantIdx: assistantIdx)
+        } else {
+            startMockStream(userText: trimmedDraft, assistantIdx: assistantIdx)
+        }
+    }
+
+    private func startLiveStream(apiKey: String, assistantIdx: Int) {
+        guard let convoIdx = conversations.firstIndex(where: { $0.id == activeConversationID }) else { return }
+        let snapshotConvo = conversations[convoIdx]
+        let turns: [ChatTurn] = snapshotConvo.messages.prefix(assistantIdx).map { msg in
+            ChatTurn(role: msg.role, text: msg.text, images: msg.attachments)
+        }
+        let snapshotOperation = activeOperation
+        let snapshotInstructions = customInstructions
+        let snapshotModel = model
+
+        running = true
+        runTask?.cancel()
+        runTask = Task { [weak self] in
+            do {
+                let stream = AIWritingService.submitChatStream(
+                    turns: turns,
+                    operation: snapshotOperation,
+                    customInstructions: snapshotInstructions,
+                    model: snapshotModel,
+                    apiKey: apiKey
+                )
+                for try await blocks in stream {
+                    if Task.isCancelled { return }
+                    await MainActor.run { self?.applyAssistantBlocks(blocks, at: assistantIdx) }
+                }
+                guard !Task.isCancelled, let self else { return }
+                await MainActor.run { self.finishStreaming(at: assistantIdx) }
+            } catch {
+                guard !Task.isCancelled, let self else { return }
+                await MainActor.run {
+                    let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    self.applyAssistantBlocks(
+                        [
+                            .heading(text: "\(snapshotModel.provider.keyLabel) request failed"),
+                            .paragraph(text: detail),
+                        ],
+                        at: assistantIdx
+                    )
+                    self.finishStreaming(at: assistantIdx)
                 }
             }
         }
     }
 
-    private func applyImportedSelectedText(_ text: String, to targetTab: InputTab) {
-        switch targetTab {
-        case .input:
-            input = text
-            inputImages = []
-            contextImages = []
-        case .context:
-            context = text
-            contextImages = []
+    private func startMockStream(userText: String, assistantIdx: Int) {
+        let snapshotOp = activeOperation
+        let snapshotMode = mode
+        let snapshotFmts = fmts
+        let snapshotContainer = containerFormat
+        let snapshotModel = model
+        running = true
+        runTask?.cancel()
+        runTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            guard !Task.isCancelled, let self else { return }
+            let blocks = MockGenerator.generate(
+                input: userText.isEmpty ? "image" : userText,
+                operation: snapshotOp,
+                mode: snapshotMode,
+                fmts: snapshotFmts,
+                containerFormat: snapshotContainer,
+                model: snapshotModel
+            )
+            await MainActor.run {
+                self.applyAssistantBlocks(blocks, at: assistantIdx)
+                self.finishStreaming(at: assistantIdx)
+            }
         }
-        lastAddedImageID = nil
-        inputTab = targetTab
     }
 
-    func copyOutput() {
-        guard let blocks = output else { return }
+    private func applyAssistantBlocks(_ blocks: [OutputBlock], at idx: Int) {
+        guard let convoIdx = conversations.firstIndex(where: { $0.id == activeConversationID }) else { return }
+        guard conversations[convoIdx].messages.indices.contains(idx) else { return }
+        conversations[convoIdx].messages[idx].blocks = blocks
+        conversations[convoIdx].messages[idx].text = MockGenerator.plainText(from: blocks)
+        conversations[convoIdx].updatedAt = Date()
+    }
+
+    private func finishStreaming(at idx: Int) {
+        running = false
+        streamingMessageIndex = nil
+        if autoFollowLatest { pinnedReplyIdx = idx }
+        ConversationStore.save(conversations)
+    }
+
+    private func moveActiveToTop() {
+        guard let id = activeConversationID,
+              let idx = conversations.firstIndex(where: { $0.id == id }),
+              idx != 0 else { return }
+        let convo = conversations.remove(at: idx)
+        conversations.insert(convo, at: 0)
+    }
+
+    // MARK: - External-text import
+
+    func importSelectedTextFromActiveApp() {
+        Task { [weak self] in
+            let result = await SelectedTextCapture.capture()
+            await MainActor.run {
+                guard let self else { return }
+                NSApp.activate(ignoringOtherApps: true)
+                switch result {
+                case .success(let text):
+                    self.draft = text
+                case .accessibilityPermissionNeeded:
+                    self.draft = "(Enable Accessibility permission in System Settings to import selected text.)"
+                case .noText:
+                    self.draft = ""
+                }
+            }
+        }
+    }
+
+    // MARK: - Output copy
+
+    func copyPinnedReply() {
+        guard let msg = pinnedMessage else { return }
         let text = renderMode == .raw
-            ? blocks.text(for: containerFormat)
-            : MockGenerator.plainText(from: blocks)
+            ? msg.blocks.text(for: containerFormat)
+            : MockGenerator.plainText(from: msg.blocks)
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(text, forType: .string)
+        pb.setString(text.isEmpty ? msg.text : text, forType: .string)
         copiedFlash = true
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             await MainActor.run { self?.copiedFlash = false }
+        }
+    }
+
+    func regeneratePinnedReply() {
+        guard let pinnedIdx = pinnedReplyIdx,
+              let convoIdx = conversations.firstIndex(where: { $0.id == activeConversationID }),
+              conversations[convoIdx].messages.indices.contains(pinnedIdx),
+              conversations[convoIdx].messages[pinnedIdx].role == .assistant else { return }
+        // Find the last user message before pinnedIdx — re-run the streaming
+        // with the same prompt, replacing the pinned assistant turn.
+        let messagesBefore = conversations[convoIdx].messages.prefix(pinnedIdx)
+        guard messagesBefore.last(where: { $0.role == .user }) != nil else { return }
+        conversations[convoIdx].messages[pinnedIdx].blocks = []
+        conversations[convoIdx].messages[pinnedIdx].text = ""
+        let assistantIdx = pinnedIdx
+        streamingMessageIndex = assistantIdx
+        if AIWritingService.supports(model.provider),
+           let apiKey = APIKeyStore.read(for: model.provider) {
+            startLiveStream(apiKey: apiKey, assistantIdx: assistantIdx)
+        } else {
+            let lastUser = messagesBefore.last(where: { $0.role == .user })
+            startMockStream(userText: lastUser?.text ?? "", assistantIdx: assistantIdx)
         }
     }
 }

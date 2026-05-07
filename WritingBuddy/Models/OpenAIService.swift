@@ -649,6 +649,7 @@ struct OpenAIInputItem: Encodable {
 
 enum OpenAIInputContent: Encodable {
     case text(String)
+    case outputText(String)
     case image(url: String)
 
     private enum CodingKeys: String, CodingKey {
@@ -662,6 +663,9 @@ enum OpenAIInputContent: Encodable {
         switch self {
         case .text(let value):
             try c.encode("input_text", forKey: .type)
+            try c.encode(value, forKey: .text)
+        case .outputText(let value):
+            try c.encode("output_text", forKey: .type)
             try c.encode(value, forKey: .text)
         case .image(let url):
             try c.encode("input_image", forKey: .type)
@@ -906,4 +910,338 @@ struct APIErrorResponse: Decodable {
 
 struct APIError: Decodable {
     let message: String
+}
+
+// MARK: - Multi-turn chat
+
+/// One turn in an outgoing chat request. The transcript ends in the latest
+/// user turn and the model is asked to produce the next assistant turn.
+struct ChatTurn {
+    let role: MessageRole
+    let text: String
+    let images: [AttachedImage]
+
+    init(role: MessageRole, text: String, images: [AttachedImage] = []) {
+        self.role = role
+        self.text = text
+        self.images = images
+    }
+}
+
+/// System prompt + transcript bundle for a chat-style submit. Mirrors the
+/// shape of `SubmitPrompt` but carries an arbitrary number of turns.
+struct ChatSubmitPrompt {
+    let model: AIModel
+    let system: String
+    let turns: [ChatTurn]
+
+    init(
+        model: AIModel,
+        operation: Operation,
+        customInstructions: String,
+        turns: [ChatTurn]
+    ) {
+        self.model = model
+        self.turns = turns
+
+        var sections: [String] = [operation.instructions]
+        let trimmedCustom = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedCustom.isEmpty {
+            sections.append("""
+            Custom direction from the user — applies to the whole conversation. Treat it as additional shaping on top of the named operation above:
+            \(trimmedCustom)
+            """)
+        }
+        sections.append("""
+        You are in a multi-turn chat with the user. Use prior turns as context when answering the latest user message. Stay concise and stay on the user's task.
+        """)
+        sections.append("""
+        Global output rules (apply to every response, override any conflicting guidance above):
+        - Always emit your final answer using the structured output schema. Do not reply with prose only — every response must populate the `blocks` array. (Anthropic providers: call the `\(StructuredOutputSchema.toolName)` tool exactly once.)
+        - Never use em dashes (—, U+2014) in the output. This applies to all prose, bullets, headings, table cells, and any other generated text.
+        - Do not substitute en dashes (–) for em dashes either. Rewrite the sentence using a comma, semicolon, colon, parentheses, or two shorter sentences instead.
+        """)
+        self.system = sections.joined(separator: "\n\n")
+    }
+}
+
+extension AIWritingService {
+    static func submitChatStream(
+        turns: [ChatTurn],
+        operation: Operation,
+        customInstructions: String = "",
+        model: AIModel,
+        apiKey: String
+    ) -> AsyncThrowingStream<[OutputBlock], Error> {
+        AsyncThrowingStream<[OutputBlock], Error> { continuation in
+            let task = Task {
+                let prompt = ChatSubmitPrompt(
+                    model: model,
+                    operation: operation,
+                    customInstructions: customInstructions,
+                    turns: turns
+                )
+
+                let inner: AsyncThrowingStream<[OutputBlock], Error>
+                switch model.provider {
+                case .openai:
+                    inner = OpenAIService.submitChatStream(prompt: prompt, apiKey: apiKey)
+                case .anthropic:
+                    inner = AnthropicService.submitChatStream(prompt: prompt, apiKey: apiKey)
+                case .google:
+                    continuation.finish(throwing: AIWritingServiceError.unsupportedProvider(model.provider))
+                    return
+                }
+
+                do {
+                    var sawNonEmpty = false
+                    for try await snapshot in inner {
+                        if !snapshot.isEmpty { sawNonEmpty = true }
+                        continuation.yield(snapshot)
+                    }
+                    if !sawNonEmpty {
+                        continuation.finish(throwing: AIWritingServiceError.emptyBlocks)
+                    } else {
+                        continuation.finish()
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
+extension OpenAIService {
+    static func submitChatStream(prompt: ChatSubmitPrompt, apiKey: String) -> AsyncThrowingStream<[OutputBlock], Error> {
+        AsyncThrowingStream<[OutputBlock], Error> { continuation in
+            let task = Task {
+                do {
+                    var request = URLRequest(url: endpoint)
+                    request.httpMethod = "POST"
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.httpBody = try JSONEncoder().encode(OpenAIChatRequest(prompt: prompt, stream: true))
+
+                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw AIWritingServiceError.invalidResponse
+                    }
+                    guard (200..<300).contains(httpResponse.statusCode) else {
+                        var buffer = Data()
+                        for try await byte in bytes { buffer.append(byte) }
+                        let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: buffer)
+                        let message = errorResponse?.error.message ?? "OpenAI request failed with status \(httpResponse.statusCode)."
+                        throw AIWritingServiceError.apiError(message)
+                    }
+
+                    let events = SSEEventStream.events(from: bytes)
+                    for try await snapshot in decodeStream(events: events) {
+                        continuation.yield(snapshot)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
+extension AnthropicService {
+    static func submitChatStream(prompt: ChatSubmitPrompt, apiKey: String) -> AsyncThrowingStream<[OutputBlock], Error> {
+        AsyncThrowingStream<[OutputBlock], Error> { continuation in
+            let task = Task {
+                do {
+                    var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+                    request.httpMethod = "POST"
+                    request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+                    request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.httpBody = try JSONEncoder().encode(AnthropicChatRequest(prompt: prompt, stream: true))
+
+                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw AIWritingServiceError.invalidResponse
+                    }
+                    guard (200..<300).contains(httpResponse.statusCode) else {
+                        var buffer = Data()
+                        for try await byte in bytes { buffer.append(byte) }
+                        let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: buffer)
+                        let message = errorResponse?.error.message ?? "Anthropic request failed with status \(httpResponse.statusCode)."
+                        throw AIWritingServiceError.apiError(message)
+                    }
+
+                    let events = SSEEventStream.events(from: bytes)
+                    for try await snapshot in decodeStream(events: events) {
+                        continuation.yield(snapshot)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
+// MARK: - Multi-turn request bodies
+
+struct OpenAIChatRequest: Encodable {
+    let model: String
+    let reasoning: Reasoning?
+    let instructions: String
+    let input: [OpenAIInputItem]
+    let text: OpenAIText
+    let stream: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case model, reasoning, instructions, input, text, stream
+    }
+
+    init(prompt: ChatSubmitPrompt, stream: Bool = false) {
+        self.model = prompt.model.apiModelID
+        self.reasoning = prompt.model.reasoningEffort.map { Reasoning(effort: $0.rawValue) }
+        self.instructions = prompt.system
+        self.input = prompt.turns.compactMap { turn in
+            var parts: [OpenAIInputContent] = []
+            // Image inputs are only valid on user turns in the Responses API.
+            if turn.role == .user {
+                for img in turn.images {
+                    parts.append(.image(url: img.dataURL))
+                }
+            }
+            let trimmed = turn.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Assistant turns must always include text; user turns may be image-only.
+            if !trimmed.isEmpty {
+                if turn.role == .assistant {
+                    parts.append(.outputText(turn.text))
+                } else {
+                    parts.append(.text(turn.text))
+                }
+            } else if turn.role == .assistant {
+                return nil
+            }
+            return OpenAIInputItem(
+                role: turn.role == .user ? "user" : "assistant",
+                content: parts
+            )
+        }
+        self.text = OpenAIText(
+            format: OpenAIResponseFormat(
+                name: StructuredOutputSchema.responseFormatName,
+                schema: RawJSON(StructuredOutputSchema.schemaData)
+            )
+        )
+        self.stream = stream ? true : nil
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(model, forKey: .model)
+        try c.encodeIfPresent(reasoning, forKey: .reasoning)
+        try c.encode(instructions, forKey: .instructions)
+        try c.encode(input, forKey: .input)
+        try c.encode(text, forKey: .text)
+        try c.encodeIfPresent(stream, forKey: .stream)
+    }
+}
+
+struct AnthropicChatRequest: Encodable {
+    let model: String
+    let maxTokens: Int
+    let system: String
+    let thinking: AnthropicThinking?
+    let outputConfig: AnthropicOutputConfig?
+    let messages: [AnthropicMessage]
+    let tools: [AnthropicTool]
+    let toolChoice: AnthropicToolChoice
+    let stream: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case model
+        case maxTokens = "max_tokens"
+        case system
+        case thinking
+        case outputConfig = "output_config"
+        case messages
+        case tools
+        case toolChoice = "tool_choice"
+        case stream
+    }
+
+    init(prompt: ChatSubmitPrompt, stream: Bool = false) {
+        self.model = prompt.model.apiModelID
+        self.maxTokens = prompt.model.anthropicChatMaxTokens
+        self.system = prompt.system
+        let thinkingEnabled = prompt.model.provider == .anthropic && prompt.model.reasoningEffort != nil
+        if thinkingEnabled, let effort = prompt.model.reasoningEffort {
+            self.thinking = AnthropicThinking(type: "adaptive")
+            self.outputConfig = AnthropicOutputConfig(effort: effort.rawValue)
+        } else {
+            self.thinking = nil
+            self.outputConfig = nil
+        }
+        self.messages = prompt.turns.compactMap { turn in
+            let trimmed = turn.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if turn.images.isEmpty {
+                guard !trimmed.isEmpty else { return nil }
+                return AnthropicMessage(
+                    role: turn.role == .user ? "user" : "assistant",
+                    content: .text(turn.text)
+                )
+            }
+            var blocks: [AnthropicContentBlock] = []
+            for img in turn.images {
+                blocks.append(.image(mediaType: img.mimeType, data: img.base64))
+            }
+            if !trimmed.isEmpty {
+                blocks.append(.text(turn.text))
+            } else if turn.role == .assistant {
+                return nil
+            }
+            return AnthropicMessage(
+                role: turn.role == .user ? "user" : "assistant",
+                content: .blocks(blocks)
+            )
+        }
+        self.tools = [
+            AnthropicTool(
+                name: StructuredOutputSchema.toolName,
+                description: StructuredOutputSchema.description,
+                inputSchema: RawJSON(StructuredOutputSchema.schemaData)
+            )
+        ]
+        self.toolChoice = thinkingEnabled ? .auto : .forceAny
+        self.stream = stream ? true : nil
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(model, forKey: .model)
+        try c.encode(maxTokens, forKey: .maxTokens)
+        try c.encode(system, forKey: .system)
+        try c.encodeIfPresent(thinking, forKey: .thinking)
+        try c.encodeIfPresent(outputConfig, forKey: .outputConfig)
+        try c.encode(messages, forKey: .messages)
+        try c.encode(tools, forKey: .tools)
+        try c.encode(toolChoice, forKey: .toolChoice)
+        try c.encodeIfPresent(stream, forKey: .stream)
+    }
+}
+
+private extension AIModel {
+    var anthropicChatMaxTokens: Int {
+        switch reasoningEffort {
+        case .xhigh, .max:
+            return 20_000
+        case .low, .medium, .high, nil:
+            return 4096
+        }
+    }
 }

@@ -63,6 +63,7 @@
 		WBBLD000000000000000065 /* AnthropicStreamDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */; };
 		WBBLD000000000000000054 /* SubmitPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000054 /* SubmitPromptTests.swift */; };
 		WBBLD000000000000000066 /* HistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000066 /* HistoryStoreTests.swift */; };
+		WBBLD000000000000000067 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000067 /* Conversation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -122,6 +123,7 @@
 		WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicStreamDecodingTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000054 /* SubmitPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubmitPromptTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000066 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000067 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
 		WBPRODUCT0000000000000001 /* WritingBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WritingBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WritingBuddyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -213,6 +215,7 @@
 				WBFILE00000000000000033 /* OutputBlock+Markdown.swift */,
 				WBFILE00000000000000044 /* StructuredOutputSchema.swift */,
 				WBFILE00000000000000008 /* RecentItem.swift */,
+				WBFILE00000000000000067 /* Conversation.swift */,
 				WBFILE00000000000000009 /* AIModel.swift */,
 				WBFILE00000000000000010 /* MockGenerator.swift */,
 				WBFILE00000000000000011 /* DiffEngine.swift */,
@@ -385,6 +388,7 @@
 				WBBLD000000000000000006 /* OutputFormat.swift in Sources */,
 				WBBLD000000000000000007 /* OutputBlock.swift in Sources */,
 				WBBLD000000000000000008 /* RecentItem.swift in Sources */,
+				WBBLD000000000000000067 /* Conversation.swift in Sources */,
 				WBBLD000000000000000009 /* AIModel.swift in Sources */,
 				WBBLD000000000000000010 /* MockGenerator.swift in Sources */,
 				WBBLD000000000000000031 /* OpenAIService.swift in Sources */,

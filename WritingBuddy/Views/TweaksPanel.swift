@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Floating panel pinned to the bottom-right of the window.
-/// Lets the user toggle theme (light/dark) and layout (stacked/side-by-side)
-/// — mirrors the design tool's Tweaks panel.
+/// Floating panel pinned to the bottom-right of the window. The chat redesign
+/// commits to a single layout (Variant A: history rail + thread + canvas),
+/// so the panel keeps a theme switch and a render-mode hint.
 struct TweaksPanel: View {
     @ObservedObject var state: AppState
     let palette: Palette
@@ -55,9 +55,6 @@ struct TweaksPanel: View {
             section(label: "Theme") {
                 segmentedTheme
             }
-            section(label: "Layout") {
-                segmentedLayout
-            }
         }
         .padding(12)
     }
@@ -76,22 +73,8 @@ struct TweaksPanel: View {
     private var segmentedTheme: some View {
         HStack(spacing: 6) {
             ForEach(AppTheme.allCases) { t in
-                segChip(label: t.label,
-                        isActive: state.theme == t) {
+                segChip(label: t.label, isActive: state.theme == t) {
                     state.theme = t
-                }
-            }
-        }
-    }
-
-    private var segmentedLayout: some View {
-        HStack(spacing: 6) {
-            ForEach(PaneLayout.allCases) { l in
-                segChip(label: l.label,
-                        isActive: state.layout == l) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        state.layout = l
-                    }
                 }
             }
         }

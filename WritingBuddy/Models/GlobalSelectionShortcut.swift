@@ -9,38 +9,30 @@ final class GlobalSelectionShortcut {
     private static let signature = OSType(0x5742484B) // WBHK
 
     private enum HotKey: UInt32, CaseIterable {
-        case importInput = 1
-        case importContext = 2
+        /// Single hotkey for the chat redesign: pull selected text from the
+        /// frontmost app and drop it into the composer.
+        case importIntoComposer = 1
 
         var keyCode: UInt32 {
             switch self {
-            case .importInput: return UInt32(kVK_ANSI_A)
-            case .importContext: return UInt32(kVK_ANSI_Q)
-            }
-        }
-
-        var targetTab: InputTab {
-            switch self {
-            case .importInput: return .input
-            case .importContext: return .context
+            case .importIntoComposer: return UInt32(kVK_ANSI_A)
             }
         }
 
         var label: String {
             switch self {
-            case .importInput: return "Control-A"
-            case .importContext: return "Control-Q"
+            case .importIntoComposer: return "Control-A"
             }
         }
     }
 
     private var hotKeyRefs: [EventHotKeyRef] = []
     private var eventHandlerRef: EventHandlerRef?
-    private var action: ((InputTab) -> Void)?
+    private var action: (() -> Void)?
 
     private init() {}
 
-    func start(action: @escaping (InputTab) -> Void) {
+    func start(action: @escaping () -> Void) {
         self.action = action
         guard hotKeyRefs.isEmpty else { return }
 
@@ -76,8 +68,9 @@ final class GlobalSelectionShortcut {
                     .fromOpaque(userData)
                     .takeUnretainedValue()
 
+                _ = hotKey
                 Task { @MainActor in
-                    shortcut.action?(hotKey.targetTab)
+                    shortcut.action?()
                 }
 
                 return noErr

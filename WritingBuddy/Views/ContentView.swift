@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var state = AppState()
-    @State private var splitFraction: Double = 0.5
 
     var body: some View {
         let palette = Palette.native(for: state.theme)
@@ -14,7 +13,6 @@ struct ContentView: View {
             }
             .background(palette.bg)
             .preferredColorScheme(state.theme.colorScheme)
-            // Hidden keyboard shortcuts for op chips
             .background(KeyboardShortcuts(state: state))
 
             TweaksPanel(state: state, palette: palette)
@@ -25,11 +23,11 @@ struct ContentView: View {
             instructionsOverlay(palette: palette)
             lightboxOverlay(palette: palette)
         }
-        .frame(minWidth: 760, minHeight: 540)
+        .frame(minWidth: 900, minHeight: 580)
         .background(WindowAccessor())
         .onAppear {
-            GlobalSelectionShortcut.shared.start { targetTab in
-                state.importSelectedTextFromActiveApp(to: targetTab)
+            GlobalSelectionShortcut.shared.start {
+                state.importSelectedTextFromActiveApp()
             }
         }
         .onDisappear {
@@ -88,55 +86,31 @@ struct ContentView: View {
     @ViewBuilder
     private func body(palette: Palette) -> some View {
         HStack(spacing: 0) {
-            HistorySidebar(state: state, palette: palette)
-            mainPanes(palette: palette)
-        }
-        .animation(.easeInOut(duration: 0.22), value: state.historyVisible)
-    }
-
-    @ViewBuilder
-    private func mainPanes(palette: Palette) -> some View {
-        GeometryReader { geo in
-            let isStacked = state.layout == .stacked
-            let total = isStacked ? geo.size.height : geo.size.width
-            let minPx: CGFloat = 120
-            let clamped = max(minPx, min(max(minPx, total - minPx), CGFloat(splitFraction) * total))
-            let inputSize = total > 0 ? clamped : 0
-
-            if isStacked {
-                VStack(spacing: 0) {
-                    InputPane(state: state, palette: palette)
-                        .frame(height: inputSize)
-                    DraggableDivider(
-                        isStacked: true,
-                        totalSize: total,
-                        fraction: $splitFraction,
-                        palette: palette
-                    )
-                    OutputPane(state: state, palette: palette)
-                        .frame(maxHeight: .infinity)
-                }
-                .coordinateSpace(name: "panes")
-            } else {
+            ConversationSidebar(state: state, palette: palette)
+            GeometryReader { geo in
+                let total = geo.size.width
                 HStack(spacing: 0) {
-                    InputPane(state: state, palette: palette)
-                        .frame(width: inputSize)
+                    ChatPane(state: state, palette: palette)
+                        .frame(width: max(0, total * state.canvasSplit))
                     DraggableDivider(
                         isStacked: false,
                         totalSize: total,
-                        fraction: $splitFraction,
-                        palette: palette
+                        fraction: $state.canvasSplit,
+                        palette: palette,
+                        minFraction: 0.45,
+                        maxFraction: 0.85
                     )
-                    OutputPane(state: state, palette: palette)
+                    OutputCanvas(state: state, palette: palette)
                         .frame(maxWidth: .infinity)
                 }
                 .coordinateSpace(name: "panes")
             }
         }
+        .animation(.easeInOut(duration: 0.22), value: state.historyVisible)
     }
 }
 
-/// Invisible buttons that bind ⌘1-⌘5 to the active mode's operations.
+/// Hidden buttons that bind ⌘1-⌘5 to the active mode's operations.
 private struct KeyboardShortcuts: View {
     @ObservedObject var state: AppState
     var body: some View {
@@ -163,8 +137,6 @@ private struct KeyboardShortcuts: View {
     }
 }
 
-/// NSViewRepresentable that taps NSWindow to make the title bar transparent
-/// and hide the title text — keeps traffic lights, drops the chrome.
 private struct WindowAccessor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let v = NSView()

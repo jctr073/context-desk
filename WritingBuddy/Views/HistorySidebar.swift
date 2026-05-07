@@ -1,6 +1,8 @@
 import SwiftUI
 
-struct HistorySidebar: View {
+/// Left rail in the chat redesign — lists conversations (whole multi-turn
+/// threads) and offers New / Clear-all controls.
+struct ConversationSidebar: View {
     @ObservedObject var state: AppState
     let palette: Palette
     @State private var confirmingClear = false
@@ -11,15 +13,17 @@ struct HistorySidebar: View {
             if state.historyVisible {
                 ScrollView {
                     LazyVStack(spacing: 2) {
-                        if state.history.isEmpty {
+                        if state.conversations.isEmpty {
                             emptyState
                         }
-
-                        ForEach(state.history) { item in
-                            RecentRow(item: item,
-                                      isSelected: state.activeRecentID == item.id,
-                                      palette: palette,
-                                      onTap: { state.selectHistoryItem(item) })
+                        ForEach(state.conversations) { convo in
+                            ConversationRow(
+                                conversation: convo,
+                                isSelected: state.activeConversationID == convo.id,
+                                palette: palette,
+                                onTap: { state.selectConversation(convo.id) },
+                                onDelete: { state.deleteConversation(convo.id) }
+                            )
                         }
                     }
                     .padding(.horizontal, 6)
@@ -37,14 +41,14 @@ struct HistorySidebar: View {
             Rectangle().fill(palette.border).frame(width: 1)
         }
         .confirmationDialog(
-            "Clear all history?",
+            "Clear all conversations?",
             isPresented: $confirmingClear,
             titleVisibility: .visible
         ) {
-            Button("Clear History", role: .destructive) { state.clearHistory() }
+            Button("Clear All", role: .destructive) { state.clearAllConversations() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes all \(state.history.count) recent items. This cannot be undone.")
+            Text("This removes all \(state.conversations.count) saved conversations. This cannot be undone.")
         }
     }
 
@@ -73,9 +77,9 @@ struct HistorySidebar: View {
                     Button(role: .destructive) {
                         confirmingClear = true
                     } label: {
-                        Label("Clear History\u{2026}", systemImage: "trash")
+                        Label("Clear All\u{2026}", systemImage: "trash")
                     }
-                    .disabled(state.history.isEmpty)
+                    .disabled(state.conversations.isEmpty)
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 10, weight: .medium))
@@ -87,7 +91,7 @@ struct HistorySidebar: View {
                 .menuIndicator(.hidden)
                 .frame(width: 22, height: 22)
                 .help("More")
-                Button(action: { state.newSession() }) {
+                Button(action: { state.newConversation() }) {
                     Image(systemName: "plus")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(palette.muted)
@@ -98,7 +102,7 @@ struct HistorySidebar: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help("New (\u{2318}N)")
+                .help("New conversation (\u{2318}N)")
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
@@ -109,9 +113,9 @@ struct HistorySidebar: View {
 
     private var footer: some View {
         HStack(spacing: 6) {
-            Image(systemName: "clock.arrow.circlepath")
+            Image(systemName: "bubble.left.and.bubble.right")
                 .font(.system(size: 11))
-            Text("\(state.history.count) recent")
+            Text("\(state.conversations.count) conversation\(state.conversations.count == 1 ? "" : "s")")
                 .font(.system(size: 11))
         }
         .foregroundColor(palette.muted)
@@ -124,63 +128,62 @@ struct HistorySidebar: View {
     }
 
     private var emptyState: some View {
-        Text("No history yet")
-            .font(.system(size: 11))
-            .foregroundColor(palette.muted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("No conversations yet")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundColor(palette.text)
+            Text("Hit + to start a new chat.")
+                .font(.system(size: 11))
+                .foregroundColor(palette.muted)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct RecentRow: View {
-    let item: RecentItem
+private struct ConversationRow: View {
+    let conversation: Conversation
     let isSelected: Bool
     let palette: Palette
     let onTap: () -> Void
+    let onDelete: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundColor(palette.text)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(item.preview)
-                    .font(.system(size: 11))
-                    .foregroundColor(palette.muted)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
                 HStack(spacing: 6) {
-                    Text(item.when)
+                    Text(conversation.title)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundColor(palette.text)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer()
+                    Text(conversation.when)
                         .font(.system(size: 10.5))
                         .foregroundColor(palette.muted)
-                    ForEach(Array(item.actions.prefix(2)), id: \.self) { tag in
-                        Text(tag)
-                            .font(.system(size: 10))
-                            .foregroundColor(palette.muted)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                    .stroke(palette.border, lineWidth: 1)
-                            )
-                    }
-                    if item.actions.count > 2 {
-                        Text("+\(item.actions.count - 2)")
-                            .font(.system(size: 10))
-                            .foregroundColor(palette.muted)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                    .stroke(palette.border, lineWidth: 1)
-                            )
-                    }
                 }
-                .padding(.top, 4)
+                HStack(spacing: 6) {
+                    Text(conversation.mode.label)
+                        .font(.system(size: 10))
+                        .foregroundColor(palette.muted)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                .fill(palette.surfaceInset)
+                        )
+                    Text(conversation.preview)
+                        .font(.system(size: 11))
+                        .foregroundColor(palette.muted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer()
+                    Text("\(conversation.messages.count)")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(palette.muted.opacity(0.7))
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -193,6 +196,11 @@ private struct RecentRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .contextMenu {
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 
     private var background: Color {

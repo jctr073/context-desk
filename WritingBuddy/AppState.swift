@@ -42,6 +42,19 @@ final class AppState: ObservableObject {
     }
     @Published var editingInstructions: Bool = false
 
+    // MARK: Conversation-wide context (reference material attached to every send)
+    @Published var contextText: String = "" {
+        didSet { syncActiveConversationMeta() }
+    }
+    @Published var contextImages: [AttachedImage] = [] {
+        didSet { syncActiveConversationMeta() }
+    }
+    @Published var lastAddedContextImageID: String? = nil
+    @Published var editingContext: Bool = false
+
+    // MARK: Output canvas diff toggle (writing mode only)
+    @Published var diffMode: Bool = false
+
     // MARK: Run state
     @Published var running: Bool = false
     /// While streaming, the assistant message at this index is being filled in.
@@ -88,6 +101,16 @@ final class AppState: ObservableObject {
               let msgs = activeConversation?.messages,
               msgs.indices.contains(idx) else { return nil }
         return msgs[idx]
+    }
+
+    /// User message immediately preceding the pinned assistant reply — the
+    /// "original" text for the writing-mode diff view.
+    var pinnedReplyOriginalUserText: String {
+        guard let idx = pinnedReplyIdx,
+              let msgs = activeConversation?.messages,
+              msgs.indices.contains(idx) else { return "" }
+        let prefix = msgs.prefix(idx)
+        return prefix.last(where: { $0.role == .user })?.text ?? ""
     }
 
     var composerPromptHistory: [String] {
@@ -143,6 +166,32 @@ final class AppState: ObservableObject {
 
     func showLightbox(_ image: AttachedImage) { lightboxImage = image }
     func dismissLightbox() { lightboxImage = nil }
+
+    // MARK: - Context helpers
+
+    var hasContext: Bool {
+        !contextText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !contextImages.isEmpty
+    }
+
+    func attachContextImages(_ images: [AttachedImage]) {
+        guard !images.isEmpty else { return }
+        contextImages.append(contentsOf: images)
+        lastAddedContextImageID = images.last?.id
+    }
+
+    func removeContextImage(_ image: AttachedImage) {
+        contextImages.removeAll { $0.id == image.id }
+        if lastAddedContextImageID == image.id { lastAddedContextImageID = nil }
+    }
+
+    func startEditingContext() { editingContext = true }
+    func cancelEditingContext() { editingContext = false }
+    func saveContext(text: String, images: [AttachedImage]) {
+        contextText = text
+        contextImages = images
+        editingContext = false
+    }
 
     private func triggerPasteFlash() {
         pasteFlash = true
@@ -220,12 +269,16 @@ final class AppState: ObservableObject {
         fmts = convo.formats
         containerFormat = convo.containerFormat
         customInstructions = convo.customInstructions
+        contextText = convo.contextText
+        contextImages = convo.contextImages
+        lastAddedContextImageID = nil
         if let m = AIModel.model(withID: convo.modelID) { model = m }
         draft = ""
         draftImages = []
         lastAddedImageID = nil
         pinnedReplyIdx = convo.latestAssistantIndex
         autoFollowLatest = true
+        diffMode = false
         suppressMetaSync = false
     }
 
@@ -240,6 +293,8 @@ final class AppState: ObservableObject {
                 pinnedReplyIdx = nil
                 draft = ""
                 draftImages = []
+                contextText = ""
+                contextImages = []
             }
         }
     }
@@ -250,6 +305,8 @@ final class AppState: ObservableObject {
         pinnedReplyIdx = nil
         draft = ""
         draftImages = []
+        contextText = ""
+        contextImages = []
         ConversationStore.save([])
     }
 
@@ -275,6 +332,8 @@ final class AppState: ObservableObject {
         convo.formats = fmts
         convo.containerFormat = containerFormat
         convo.customInstructions = customInstructions
+        convo.contextText = contextText
+        convo.contextImages = contextImages
         convo.modelID = model.id
         conversations[idx] = convo
     }
@@ -339,8 +398,21 @@ final class AppState: ObservableObject {
     private func startLiveStream(apiKey: String, assistantIdx: Int) {
         guard let convoIdx = conversations.firstIndex(where: { $0.id == activeConversationID }) else { return }
         let snapshotConvo = conversations[convoIdx]
-        let turns: [ChatTurn] = snapshotConvo.messages.prefix(assistantIdx).map { msg in
+        var turns: [ChatTurn] = snapshotConvo.messages.prefix(assistantIdx).map { msg in
             ChatTurn(role: msg.role, text: msg.text, images: msg.attachments)
+        }
+        let trimmedContext = contextText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedContext.isEmpty || !contextImages.isEmpty,
+           let firstUser = turns.firstIndex(where: { $0.role == .user }) {
+            let original = turns[firstUser]
+            let preface = trimmedContext.isEmpty
+                ? ""
+                : "Reference material to keep in mind for this conversation:\n\n\(trimmedContext)\n\n---\n\n"
+            turns[firstUser] = ChatTurn(
+                role: .user,
+                text: preface + original.text,
+                images: contextImages + original.images
+            )
         }
         let snapshotOperation = activeOperation
         let snapshotInstructions = customInstructions

@@ -46,6 +46,16 @@ struct OutputCanvas: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(palette.text)
                 Spacer()
+                if state.mode == .writing {
+                    IconButton(palette: palette,
+                               isActive: state.diffMode,
+                               isDisabled: !canShowDiff,
+                               help: state.diffMode ? "Hide diff" : "Show diff against input",
+                               action: { state.diffMode.toggle() }) {
+                        Image(systemName: "doc.text.below.ecg")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                }
                 IconButton(palette: palette, help: "Copy", action: { state.copyPinnedReply() }) {
                     Image(systemName: state.copiedFlash ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 11, weight: .medium))
@@ -160,6 +170,12 @@ struct OutputCanvas: View {
             if state.streamingMessageIndex == state.pinnedReplyIdx && msg.blocks.isEmpty {
                 StreamingPlaceholder(palette: palette)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if state.diffMode && state.mode == .writing && !msg.blocks.isEmpty {
+                DiffView(
+                    original: state.pinnedReplyOriginalUserText,
+                    current: msg.blocks,
+                    palette: palette
+                )
             } else if msg.blocks.isEmpty {
                 ScrollView {
                     Text(msg.text)
@@ -181,6 +197,13 @@ struct OutputCanvas: View {
         } else {
             EmptyOutputState(palette: palette)
         }
+    }
+
+    private var canShowDiff: Bool {
+        guard let msg = state.pinnedMessage,
+              msg.role == .assistant,
+              !msg.blocks.isEmpty else { return false }
+        return !state.pinnedReplyOriginalUserText.isEmpty
     }
 
     // MARK: - Footer

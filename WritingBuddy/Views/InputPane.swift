@@ -62,6 +62,7 @@ struct ChatPane: View {
                 onSelectChatOp: { state.setChatOp($0) }
             )
             instructionsButton
+            contextButton
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -69,6 +70,43 @@ struct ChatPane: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(palette.border).frame(height: 1)
         }
+    }
+
+    @ViewBuilder
+    private var contextButton: some View {
+        let active = state.hasContext
+        Button {
+            state.startEditingContext()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 11, weight: .medium))
+                Text("Context")
+                    .font(.system(size: 12, weight: .medium))
+                if active {
+                    Circle()
+                        .fill(palette.accent)
+                        .frame(width: 5, height: 5)
+                }
+            }
+            .foregroundColor(palette.text)
+            .padding(.horizontal, 11)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(palette.chip)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(active ? palette.accent.opacity(0.6) : palette.chipBorder,
+                            lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(active
+              ? "Reference material attached to every message (click to edit)"
+              : "Add reference material to attach to every message")
     }
 
     @ViewBuilder

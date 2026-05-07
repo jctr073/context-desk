@@ -64,6 +64,7 @@
 		WBBLD000000000000000054 /* SubmitPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000054 /* SubmitPromptTests.swift */; };
 		WBBLD000000000000000066 /* HistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000066 /* HistoryStoreTests.swift */; };
 		WBBLD000000000000000067 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000067 /* Conversation.swift */; };
+		WBBLD000000000000000068 /* ContextSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000068 /* ContextSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -124,6 +125,7 @@
 		WBFILE00000000000000054 /* SubmitPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubmitPromptTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000066 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000067 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000068 /* ContextSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextSheet.swift; sourceTree = "<group>"; };
 		WBPRODUCT0000000000000001 /* WritingBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WritingBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		WBPRODUCT0000000000000002 /* WritingBuddyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WritingBuddyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -259,6 +261,7 @@
 				WBFILE00000000000000030 /* APIKeySetupSheet.swift */,
 				WBFILE00000000000000034 /* SegmentedToggle.swift */,
 				WBFILE00000000000000036 /* CustomInstructionsSheet.swift */,
+				WBFILE00000000000000068 /* ContextSheet.swift */,
 				WBFILE00000000000000038 /* ImageLightbox.swift */,
 				WBFILE00000000000000039 /* ModePill.swift */,
 				WBFILE00000000000000040 /* ActionDropdown.swift */,
@@ -415,6 +418,7 @@
 				WBBLD000000000000000034 /* SegmentedToggle.swift in Sources */,
 				WBBLD000000000000000035 /* GlobalSelectionShortcut.swift in Sources */,
 				WBBLD000000000000000036 /* CustomInstructionsSheet.swift in Sources */,
+				WBBLD000000000000000068 /* ContextSheet.swift in Sources */,
 				WBBLD000000000000000037 /* AttachedImage.swift in Sources */,
 				WBBLD000000000000000038 /* ImageLightbox.swift in Sources */,
 				WBBLD000000000000000039 /* ModePill.swift in Sources */,

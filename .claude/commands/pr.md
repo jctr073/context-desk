@@ -21,7 +21,30 @@ Run these in parallel:
 
 If the current branch is `main`, stop and tell the user — no PR to open.
 
-## Step 2 — Draft the PR
+## Step 2 — Bump the version
+
+The Xcode project tracks two values in `WritingBuddy.xcodeproj/project.pbxproj`, each present in **4 configurations** (app Debug/Release, tests Debug/Release):
+
+- `MARKETING_VERSION` — semver `MAJOR.MINOR.PATCH` (e.g. `1.0.1`)
+- `CURRENT_PROJECT_VERSION` — monotonic build number
+
+Read the current values (`grep -nE '(MARKETING_VERSION|CURRENT_PROJECT_VERSION)' WritingBuddy.xcodeproj/project.pbxproj`), then decide the bump from the diff:
+
+- **Patch** (default): bug fixes, refactors, internal-only work, tests, docs, build/tooling tweaks, dependency bumps without behavior change.
+- **Minor**: a new user-visible feature, a new screen/module, a new provider integration, or any meaningful capability addition.
+- **Major**: a breaking change, removal of a major feature, fundamental UX overhaul, or anything the user should explicitly opt into. **Always pause and confirm with the user before bumping major.** Show your reasoning and the proposed new version.
+
+Always increment `CURRENT_PROJECT_VERSION` by 1, regardless of which semver part bumps.
+
+Apply the changes with `Edit` using `replace_all: true` so all 4 configurations stay in sync. Then commit just the pbxproj change with a message like:
+
+```
+Bump version to <new version> (build <new build>)
+```
+
+Do not bundle other unrelated changes into this commit.
+
+## Step 3 — Draft the PR
 
 Read every commit in the range, not just the latest. Synthesize a PR body that follows the template *exactly* (section order, headings, checkboxes), filling in real content drawn from the diff and commit history:
 
@@ -39,15 +62,15 @@ Read every commit in the range, not just the latest. Synthesize a PR body that f
 
 If `$ARGUMENTS` is non-empty, weave that context into the Summary / Implementation Notes / Risk sections where it fits.
 
-## Step 3 — Confirm before pushing
+## Step 4 — Confirm before pushing
 
-Show the user the drafted title and body and ask if they want to proceed. Do NOT push or create the PR until they confirm.
+Show the user the drafted title and body (and a one-line reminder of the version bump applied in Step 2) and ask if they want to proceed. Do NOT push or create the PR until they confirm.
 
-## Step 4 — Push and create
+## Step 5 — Push and create
 
 After confirmation, run in parallel where possible:
 
-- If the branch has no upstream (step 1 showed no `@{u}`), `git push -u origin HEAD`. Otherwise `git push` only if `git status` showed `ahead` commits.
+- If the branch has no upstream (step 1 showed no `@{u}`), `git push -u origin HEAD`. Otherwise `git push` (the version-bump commit from step 2 makes this branch ahead of remote).
 - `gh pr create --title "<title>" --body "$(cat <<'EOF'\n<body>\nEOF\n)"` — pass the body via heredoc so markdown formatting is preserved.
 
 Do not append a "Generated with Claude Code" footer — the project template doesn't include one.

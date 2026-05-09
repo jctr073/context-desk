@@ -44,7 +44,19 @@ Bump version to <new version> (build <new build>)
 
 Do not bundle other unrelated changes into this commit.
 
-## Step 3 — Draft the PR
+## Step 3 — Keep the README current
+
+Read `README.md` and compare it against what the branch changed. Update the README whenever the branch alters anything that the README documents, for example:
+
+- User-visible features, operations, or modes listed in the Features section.
+- Model lineup, provider behavior, or model-routing details.
+- Setup, environment variables, or required API keys.
+- Scripts under `scripts/` or the build/install commands they wrap.
+- Project layout (new top-level files, renamed modules, removed components).
+
+If nothing the README covers actually changed, leave it alone — do not churn the file just to touch it. If you do edit it, commit only the README change with a message like `Update README for <short summary>` so the PR diff stays clean. If you decide no update is needed, briefly note that reasoning to the user in Step 5.
+
+## Step 4 — Draft the PR
 
 Read every commit in the range, not just the latest. Synthesize a PR body that follows the template *exactly* (section order, headings, checkboxes), filling in real content drawn from the diff and commit history:
 
@@ -62,15 +74,15 @@ Read every commit in the range, not just the latest. Synthesize a PR body that f
 
 If `$ARGUMENTS` is non-empty, weave that context into the Summary / Implementation Notes / Risk sections where it fits.
 
-## Step 4 — Confirm before pushing
+## Step 5 — Confirm before pushing
 
-Show the user the drafted title and body (and a one-line reminder of the version bump applied in Step 2) and ask if they want to proceed. Do NOT push or create the PR until they confirm.
+Show the user the drafted title and body, a one-line reminder of the version bump applied in Step 2, and a one-line note on the README (either the change made in Step 3 or that no update was needed). Ask if they want to proceed. Do NOT push or create the PR until they confirm.
 
-## Step 5 — Push and create
+## Step 6 — Push and create
 
 After confirmation, run in parallel where possible:
 
-- If the branch has no upstream (step 1 showed no `@{u}`), `git push -u origin HEAD`. Otherwise `git push` (the version-bump commit from step 2 makes this branch ahead of remote).
+- If the branch has no upstream (step 1 showed no `@{u}`), `git push -u origin HEAD`. Otherwise `git push` (the version-bump commit from step 2, plus any README commit from step 3, makes this branch ahead of remote).
 - `gh pr create --title "<title>" --body "$(cat <<'EOF'\n<body>\nEOF\n)"` — pass the body via heredoc so markdown formatting is preserved.
 
 Do not append a "Generated with Claude Code" footer — the project template doesn't include one.

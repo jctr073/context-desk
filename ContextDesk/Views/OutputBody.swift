@@ -12,10 +12,12 @@ struct OutputBody: View {
         if let blocks = blocks, !blocks.isEmpty {
             switch renderMode {
             case .rendered:
+                let registry = CitationRegistry.build(from: blocks)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                            renderBlock(block)
+                        let clusters = ToolUnitWalker.cluster(ToolUnitWalker.walk(blocks))
+                        ForEach(Array(clusters.enumerated()), id: \.offset) { _, cluster in
+                            renderCluster(cluster, registry: registry)
                         }
                     }
                     .padding(.horizontal, 18)
@@ -31,10 +33,52 @@ struct OutputBody: View {
     }
 
     @ViewBuilder
-    private func renderBlock(_ block: OutputBlock) -> some View {
+    private func renderCluster(_ cluster: ToolUnitWalker.Cluster, registry: CitationRegistry) -> some View {
+        switch cluster {
+        case .block(let block):
+            renderBlock(block, registry: registry)
+        case .toolCluster(let units):
+            if units.count == 1, let unit = units.first {
+                if ToolKind.from(name: unit.call.name) == .code {
+                    CodeSessionRollView(units: [unit], palette: palette)
+                        .frame(maxWidth: 760, alignment: .leading)
+                        .padding(.bottom, 12)
+                } else {
+                    ToolCardView(
+                        id: unit.call.id,
+                        toolName: unit.call.name,
+                        argumentsJSON: unit.call.argumentsJSON,
+                        resultContent: unit.result?.content,
+                        isError: unit.result?.isError ?? false,
+                        palette: palette,
+                        defaultExpanded: shouldDefaultExpand(unit)
+                    )
+                    .frame(maxWidth: 760, alignment: .leading)
+                    .padding(.bottom, 12)
+                }
+            } else if units.allSatisfy({ ToolKind.from(name: $0.call.name) == .code }) {
+                CodeSessionRollView(units: units, palette: palette)
+                    .frame(maxWidth: 760, alignment: .leading)
+                    .padding(.bottom, 12)
+            } else {
+                ToolGroupView(units: units, palette: palette)
+                    .frame(maxWidth: 760, alignment: .leading)
+                    .padding(.bottom, 12)
+            }
+        }
+    }
+
+    private func shouldDefaultExpand(_ unit: ToolUnit) -> Bool {
+        guard let result = unit.result, !result.isError else { return false }
+        guard ToolKind.from(name: unit.call.name) == .webSearch else { return false }
+        return !ToolResultParser.webSearchHits(from: result.content).isEmpty
+    }
+
+    @ViewBuilder
+    private func renderBlock(_ block: OutputBlock, registry: CitationRegistry) -> some View {
         switch block {
         case .paragraph(let text):
-            Text(attributedInline(text))
+            proseText(text, registry: registry)
                 .font(.system(size: 14))
                 .lineSpacing(14 * 0.55) // approximates line-height 1.55
                 .foregroundColor(palette.text)
@@ -55,7 +99,7 @@ struct OutputBody: View {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text("\u{2022}")
                             .foregroundColor(palette.text)
-                        Text(attributedInline(item))
+                        proseText(item, registry: registry)
                             .font(.system(size: 14))
                             .lineSpacing(14 * 0.55)
                             .foregroundColor(palette.text)
@@ -73,39 +117,37 @@ struct OutputBody: View {
         case .codeBlock(let language, let code):
             CodeBlock(language: language, code: code, palette: palette)
                 .padding(.bottom, 12)
+
+        case .toolCall, .toolResult:
+            // Should be paired into a ToolCardView by the unit walker.
+            // Reaching here means an orphan result with no preceding call;
+            // render a minimal pretty fallback so it's not invisible.
+            if case .toolResult(let cid, let content, let isError) = block {
+                ToolCardView(
+                    id: cid,
+                    toolName: "tool",
+                    argumentsJSON: "",
+                    resultContent: content,
+                    isError: isError,
+                    palette: palette
+                )
+                .frame(maxWidth: 760, alignment: .leading)
+                .padding(.bottom, 12)
+            }
+
+        case .unknown(let kind, _):
+            UnsupportedBlock(kind: kind, palette: palette)
+                .padding(.bottom, 12)
         }
     }
 
-    private func attributedInline(_ s: String) -> AttributedString {
-        switch containerFormat {
-        case .slack:
-            return attributedMarkdown(Self.slackInlineAsMarkdown(s))
-        case .markdown, .plain, .html:
-            return attributedMarkdown(s)
-        }
-    }
-
-    private func attributedMarkdown(_ s: String) -> AttributedString {
-        (try? AttributedString(markdown: s, options: .init(
-            interpretedSyntax: .inlineOnlyPreservingWhitespace
-        ))) ?? AttributedString(s)
-    }
-
-    private static func slackInlineAsMarkdown(_ text: String) -> String {
-        var output = text
-        output = replacing(output, pattern: #"<([^|>]+)\|([^>]+)>"#, template: #"[$2]($1)"#)
-        output = replacing(output, pattern: #"(?<!\*)\*([^*\n]+)\*(?!\*)"#, template: #"**$1**"#)
-        output = replacing(output, pattern: #"(?<!_)_([^_\n]+)_(?!_)"#, template: #"*$1*"#)
-        output = replacing(output, pattern: #"(?<!~)~([^~\n]+)~(?!~)"#, template: #"~~$1~~"#)
-        return output
-    }
-
-    private static func replacing(_ text: String, pattern: String, template: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return text
-        }
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: template)
+    private func proseText(_ s: String, registry: CitationRegistry) -> Text {
+        ProseTextBuilder.text(
+            s,
+            registry: registry,
+            palette: palette,
+            slack: containerFormat == .slack
+        )
     }
 }
 
@@ -216,6 +258,25 @@ private struct TableBlock: View {
                 .stroke(palette.border, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct UnsupportedBlock: View {
+    let kind: String
+    let palette: Palette
+
+    var body: some View {
+        Text("Unsupported block: \(kind)")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(palette.muted)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(palette.surfaceInset)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(palette.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 

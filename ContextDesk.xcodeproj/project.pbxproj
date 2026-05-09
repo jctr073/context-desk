@@ -63,6 +63,16 @@
 		WBBLD000000000000000065 /* AnthropicStreamDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */; };
 		WBBLD000000000000000054 /* SubmitPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000054 /* SubmitPromptTests.swift */; };
 		WBBLD000000000000000066 /* HistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000066 /* HistoryStoreTests.swift */; };
+		WBBLD000000000000000070 /* OpenAIRequestEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000070 /* OpenAIRequestEncodingTests.swift */; };
+		WBBLD000000000000000071 /* AnthropicRequestEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000071 /* AnthropicRequestEncodingTests.swift */; };
+		WBBLD000000000000000072 /* ToolCallReplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000072 /* ToolCallReplay.swift */; };
+		WBBLD000000000000000073 /* ToolCallReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000073 /* ToolCallReplayTests.swift */; };
+		WBBLD000000000000000074 /* OpenAIWebSearchDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */; };
+		WBBLD000000000000000075 /* AnthropicWebSearchDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */; };
+		WBBLD000000000000000078 /* CitationPillsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000078 /* CitationPillsTests.swift */; };
+		WBBLD000000000000000079 /* CodeSessionRollTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000079 /* CodeSessionRollTests.swift */; };
+		WBBLD000000000000000076 /* ToolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000076 /* ToolCardView.swift */; };
+		WBBLD000000000000000077 /* CitationPills.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000077 /* CitationPills.swift */; };
 		WBBLD000000000000000067 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000067 /* Conversation.swift */; };
 		WBBLD000000000000000068 /* ContextSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000068 /* ContextSheet.swift */; };
 /* End PBXBuildFile section */
@@ -124,6 +134,16 @@
 		WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicStreamDecodingTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000054 /* SubmitPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubmitPromptTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000066 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000070 /* OpenAIRequestEncodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIRequestEncodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000071 /* AnthropicRequestEncodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicRequestEncodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000072 /* ToolCallReplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallReplay.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000073 /* ToolCallReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallReplayTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIWebSearchDecodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicWebSearchDecodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000078 /* CitationPillsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationPillsTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000079 /* CodeSessionRollTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeSessionRollTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000076 /* ToolCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCardView.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000077 /* CitationPills.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationPills.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000067 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000068 /* ContextSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextSheet.swift; sourceTree = "<group>"; };
 		WBPRODUCT0000000000000001 /* ContextDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ContextDesk.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -171,6 +191,13 @@
 				WBFILE00000000000000064 /* OpenAIStreamDecodingTests.swift */,
 				WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */,
 				WBFILE00000000000000066 /* HistoryStoreTests.swift */,
+				WBFILE00000000000000070 /* OpenAIRequestEncodingTests.swift */,
+				WBFILE00000000000000071 /* AnthropicRequestEncodingTests.swift */,
+				WBFILE00000000000000073 /* ToolCallReplayTests.swift */,
+				WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */,
+				WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */,
+				WBFILE00000000000000078 /* CitationPillsTests.swift */,
+				WBFILE00000000000000079 /* CodeSessionRollTests.swift */,
 			);
 			path = ContextDeskTests;
 			sourceTree = "<group>";
@@ -228,6 +255,7 @@
 				WBFILE00000000000000037 /* AttachedImage.swift */,
 				WBFILE00000000000000060 /* SSEEventStream.swift */,
 				WBFILE00000000000000061 /* StreamingOutputParser.swift */,
+				WBFILE00000000000000072 /* ToolCallReplay.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -245,6 +273,8 @@
 				WBFILE00000000000000019 /* DiffView.swift */,
 				WBFILE00000000000000020 /* StreamingPlaceholder.swift */,
 				WBFILE00000000000000021 /* TweaksPanel.swift */,
+				WBFILE00000000000000076 /* ToolCardView.swift */,
+				WBFILE00000000000000077 /* CitationPills.swift */,
 				WBGROUP00000000000000007 /* Components */,
 			);
 			path = Views;
@@ -406,6 +436,8 @@
 				WBBLD000000000000000019 /* DiffView.swift in Sources */,
 				WBBLD000000000000000020 /* StreamingPlaceholder.swift in Sources */,
 				WBBLD000000000000000021 /* TweaksPanel.swift in Sources */,
+				WBBLD000000000000000076 /* ToolCardView.swift in Sources */,
+				WBBLD000000000000000077 /* CitationPills.swift in Sources */,
 				WBBLD000000000000000022 /* Chip.swift in Sources */,
 				WBBLD000000000000000023 /* IconButton.swift in Sources */,
 				WBBLD000000000000000024 /* Kbd.swift in Sources */,
@@ -429,6 +461,7 @@
 				WBBLD000000000000000044 /* StructuredOutputSchema.swift in Sources */,
 				WBBLD000000000000000060 /* SSEEventStream.swift in Sources */,
 				WBBLD000000000000000061 /* StreamingOutputParser.swift in Sources */,
+				WBBLD000000000000000072 /* ToolCallReplay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -446,6 +479,13 @@
 				WBBLD000000000000000064 /* OpenAIStreamDecodingTests.swift in Sources */,
 				WBBLD000000000000000065 /* AnthropicStreamDecodingTests.swift in Sources */,
 				WBBLD000000000000000066 /* HistoryStoreTests.swift in Sources */,
+				WBBLD000000000000000070 /* OpenAIRequestEncodingTests.swift in Sources */,
+				WBBLD000000000000000071 /* AnthropicRequestEncodingTests.swift in Sources */,
+				WBBLD000000000000000073 /* ToolCallReplayTests.swift in Sources */,
+				WBBLD000000000000000074 /* OpenAIWebSearchDecodingTests.swift in Sources */,
+				WBBLD000000000000000075 /* AnthropicWebSearchDecodingTests.swift in Sources */,
+				WBBLD000000000000000078 /* CitationPillsTests.swift in Sources */,
+				WBBLD000000000000000079 /* CodeSessionRollTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -571,7 +611,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -584,7 +624,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.1;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -599,7 +639,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -612,7 +652,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.3.1;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -625,10 +665,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.3.1;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -643,10 +683,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.3.1;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

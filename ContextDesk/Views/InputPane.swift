@@ -61,6 +61,7 @@ struct ChatPane: View {
                 onSelectWritingOp: { state.toggleOp($0) },
                 onSelectChatOp: { state.setChatOp($0) }
             )
+            webButton
             instructionsButton
             contextButton
         }
@@ -70,6 +71,43 @@ struct ChatPane: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(palette.border).frame(height: 1)
         }
+    }
+
+    @ViewBuilder
+    private var webButton: some View {
+        let active = state.webAccessEnabled
+        Button {
+            state.webAccessEnabled.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                    .font(.system(size: 11, weight: .medium))
+                Text("Web")
+                    .font(.system(size: 12, weight: .medium))
+                if active {
+                    Circle()
+                        .fill(palette.accent)
+                        .frame(width: 5, height: 5)
+                }
+            }
+            .foregroundColor(palette.text)
+            .padding(.horizontal, 11)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(palette.chip)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(active ? palette.accent.opacity(0.6) : palette.chipBorder,
+                            lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(active
+              ? "Web search and fetch are enabled for this conversation"
+              : "Enable web search and fetch for this conversation")
     }
 
     @ViewBuilder
@@ -376,19 +414,44 @@ private struct AssistantBlocks: View {
     let blocks: [OutputBlock]
     let palette: Palette
     var body: some View {
+        let registry = CitationRegistry.build(from: blocks)
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                renderBlock(block)
+            let clusters = ToolUnitWalker.cluster(ToolUnitWalker.walk(blocks))
+            ForEach(Array(clusters.enumerated()), id: \.offset) { _, cluster in
+                renderCluster(cluster, registry: registry)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
-    private func renderBlock(_ block: OutputBlock) -> some View {
+    private func renderCluster(_ cluster: ToolUnitWalker.Cluster, registry: CitationRegistry) -> some View {
+        switch cluster {
+        case .block(let block):
+            renderBlock(block, registry: registry)
+        case .toolCluster(let units):
+            if units.count == 1, let unit = units.first {
+                ToolCardView(
+                    id: unit.call.id,
+                    toolName: unit.call.name,
+                    argumentsJSON: unit.call.argumentsJSON,
+                    resultContent: unit.result?.content,
+                    isError: unit.result?.isError ?? false,
+                    palette: palette
+                )
+                .padding(.bottom, 10)
+            } else {
+                ToolGroupView(units: units, palette: palette)
+                    .padding(.bottom, 10)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderBlock(_ block: OutputBlock, registry: CitationRegistry) -> some View {
         switch block {
         case .paragraph(let text):
-            Text(attributed(text))
+            ProseTextBuilder.text(text, registry: registry, palette: palette)
                 .font(.system(size: 13))
                 .lineSpacing(13 * 0.6)
                 .foregroundColor(palette.text)
@@ -405,7 +468,7 @@ private struct AssistantBlocks: View {
                 ForEach(items, id: \.self) { item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("\u{2022}").foregroundColor(palette.text)
-                        Text(attributed(item))
+                        ProseTextBuilder.text(item, registry: registry, palette: palette)
                             .font(.system(size: 13))
                             .lineSpacing(13 * 0.55)
                             .foregroundColor(palette.text)
@@ -414,17 +477,14 @@ private struct AssistantBlocks: View {
                 }
             }
             .padding(.bottom, 10)
-        case .table, .codeBlock:
-            // Reuse the rich renderer used by the output canvas for tables / code.
+        case .table, .codeBlock, .toolCall, .toolResult, .unknown:
+            // Reuse the rich renderer used by the output canvas for tables /
+            // code / forward-compat unknown blocks. Tool blocks are paired
+            // upstream — reaching here means an orphan, which OutputBody
+            // also gracefully handles.
             OutputBody(blocks: [block], renderMode: .rendered, containerFormat: .markdown, palette: palette)
                 .padding(.bottom, 10)
         }
-    }
-
-    private func attributed(_ s: String) -> AttributedString {
-        (try? AttributedString(markdown: s, options: .init(
-            interpretedSyntax: .inlineOnlyPreservingWhitespace
-        ))) ?? AttributedString(s)
     }
 }
 

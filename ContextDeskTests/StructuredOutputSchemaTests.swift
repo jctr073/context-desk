@@ -10,6 +10,8 @@ final class StructuredOutputSchemaTests: XCTestCase {
     }
 
     func testBlocksItemsHasFiveAnyOfBranches() throws {
+        // Tool telemetry is decoded from provider events, not accepted from
+        // the model's structured final-answer schema.
         let schema = StructuredOutputSchema.schema
         let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
         let blocks = try XCTUnwrap(properties["blocks"] as? [String: Any])

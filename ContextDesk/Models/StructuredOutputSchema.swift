@@ -101,6 +101,7 @@ enum StructuredOutputSchema {
             "language": ["type": ["string", "null"]],
         ],
     ]
+
 }
 
 /// Wraps a pre-encoded JSON blob so it can be embedded inside an `Encodable`

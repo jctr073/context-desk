@@ -47,6 +47,11 @@ deterministic mock output for now.
   input.
 - Rendered output supports paragraphs, headings, bullet lists, tables, and
   syntax-highlighted code blocks.
+- Tool activity renders inline as compact cards: web search shows a smart
+  summary of result titles + favicons + domains, web fetch shows the fetched
+  URL with an expandable preview, and consecutive code-execution steps roll
+  up into one collapsible session. `<cite>` tags in the prose are replaced
+  with inline favicon pills linking to the cited source.
 - Live OpenAI / Anthropic responses stream incrementally through Server-Sent
   Events; Gemini uses the deterministic mock stream until live support is wired
   up.

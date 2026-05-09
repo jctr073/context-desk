@@ -245,8 +245,6 @@ private struct FormatChip: View {
     let palette: Palette
     let action: () -> Void
 
-    @State private var hovering = false
-
     var body: some View {
         Button(action: action) {
             Group {
@@ -271,7 +269,6 @@ private struct FormatChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
         .help(label)
     }
 }

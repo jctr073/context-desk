@@ -10,6 +10,9 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 
+# Editor workspace settings
+.vscode/
+
 # Local packaging artifacts
 *.dSYM/
 *.dSYM.zip

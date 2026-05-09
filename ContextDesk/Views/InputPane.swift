@@ -376,19 +376,44 @@ private struct AssistantBlocks: View {
     let blocks: [OutputBlock]
     let palette: Palette
     var body: some View {
+        let registry = CitationRegistry.build(from: blocks)
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                renderBlock(block)
+            let clusters = ToolUnitWalker.cluster(ToolUnitWalker.walk(blocks))
+            ForEach(Array(clusters.enumerated()), id: \.offset) { _, cluster in
+                renderCluster(cluster, registry: registry)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
-    private func renderBlock(_ block: OutputBlock) -> some View {
+    private func renderCluster(_ cluster: ToolUnitWalker.Cluster, registry: CitationRegistry) -> some View {
+        switch cluster {
+        case .block(let block):
+            renderBlock(block, registry: registry)
+        case .toolCluster(let units):
+            if units.count == 1, let unit = units.first {
+                ToolCardView(
+                    id: unit.call.id,
+                    toolName: unit.call.name,
+                    argumentsJSON: unit.call.argumentsJSON,
+                    resultContent: unit.result?.content,
+                    isError: unit.result?.isError ?? false,
+                    palette: palette
+                )
+                .padding(.bottom, 10)
+            } else {
+                ToolGroupView(units: units, palette: palette)
+                    .padding(.bottom, 10)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func renderBlock(_ block: OutputBlock, registry: CitationRegistry) -> some View {
         switch block {
         case .paragraph(let text):
-            Text(attributed(text))
+            ProseTextBuilder.text(text, registry: registry, palette: palette)
                 .font(.system(size: 13))
                 .lineSpacing(13 * 0.6)
                 .foregroundColor(palette.text)
@@ -405,7 +430,7 @@ private struct AssistantBlocks: View {
                 ForEach(items, id: \.self) { item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("\u{2022}").foregroundColor(palette.text)
-                        Text(attributed(item))
+                        ProseTextBuilder.text(item, registry: registry, palette: palette)
                             .font(.system(size: 13))
                             .lineSpacing(13 * 0.55)
                             .foregroundColor(palette.text)
@@ -416,16 +441,12 @@ private struct AssistantBlocks: View {
             .padding(.bottom, 10)
         case .table, .codeBlock, .toolCall, .toolResult, .unknown:
             // Reuse the rich renderer used by the output canvas for tables /
-            // code / tool activity / forward-compat unknown blocks.
+            // code / forward-compat unknown blocks. Tool blocks are paired
+            // upstream — reaching here means an orphan, which OutputBody
+            // also gracefully handles.
             OutputBody(blocks: [block], renderMode: .rendered, containerFormat: .markdown, palette: palette)
                 .padding(.bottom, 10)
         }
-    }
-
-    private func attributed(_ s: String) -> AttributedString {
-        (try? AttributedString(markdown: s, options: .init(
-            interpretedSyntax: .inlineOnlyPreservingWhitespace
-        ))) ?? AttributedString(s)
     }
 }
 

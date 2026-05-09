@@ -69,6 +69,9 @@
 		WBBLD000000000000000073 /* ToolCallReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000073 /* ToolCallReplayTests.swift */; };
 		WBBLD000000000000000074 /* OpenAIWebSearchDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */; };
 		WBBLD000000000000000075 /* AnthropicWebSearchDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */; };
+		WBBLD000000000000000078 /* CitationPillsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000078 /* CitationPillsTests.swift */; };
+		WBBLD000000000000000076 /* ToolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000076 /* ToolCardView.swift */; };
+		WBBLD000000000000000077 /* CitationPills.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000077 /* CitationPills.swift */; };
 		WBBLD000000000000000067 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000067 /* Conversation.swift */; };
 		WBBLD000000000000000068 /* ContextSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000068 /* ContextSheet.swift */; };
 /* End PBXBuildFile section */
@@ -136,6 +139,9 @@
 		WBFILE00000000000000073 /* ToolCallReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallReplayTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIWebSearchDecodingTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicWebSearchDecodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000078 /* CitationPillsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationPillsTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000076 /* ToolCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCardView.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000077 /* CitationPills.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationPills.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000067 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000068 /* ContextSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextSheet.swift; sourceTree = "<group>"; };
 		WBPRODUCT0000000000000001 /* ContextDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ContextDesk.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -188,6 +194,7 @@
 				WBFILE00000000000000073 /* ToolCallReplayTests.swift */,
 				WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */,
 				WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */,
+				WBFILE00000000000000078 /* CitationPillsTests.swift */,
 			);
 			path = ContextDeskTests;
 			sourceTree = "<group>";
@@ -263,6 +270,8 @@
 				WBFILE00000000000000019 /* DiffView.swift */,
 				WBFILE00000000000000020 /* StreamingPlaceholder.swift */,
 				WBFILE00000000000000021 /* TweaksPanel.swift */,
+				WBFILE00000000000000076 /* ToolCardView.swift */,
+				WBFILE00000000000000077 /* CitationPills.swift */,
 				WBGROUP00000000000000007 /* Components */,
 			);
 			path = Views;
@@ -424,6 +433,8 @@
 				WBBLD000000000000000019 /* DiffView.swift in Sources */,
 				WBBLD000000000000000020 /* StreamingPlaceholder.swift in Sources */,
 				WBBLD000000000000000021 /* TweaksPanel.swift in Sources */,
+				WBBLD000000000000000076 /* ToolCardView.swift in Sources */,
+				WBBLD000000000000000077 /* CitationPills.swift in Sources */,
 				WBBLD000000000000000022 /* Chip.swift in Sources */,
 				WBBLD000000000000000023 /* IconButton.swift in Sources */,
 				WBBLD000000000000000024 /* Kbd.swift in Sources */,
@@ -470,6 +481,7 @@
 				WBBLD000000000000000073 /* ToolCallReplayTests.swift in Sources */,
 				WBBLD000000000000000074 /* OpenAIWebSearchDecodingTests.swift in Sources */,
 				WBBLD000000000000000075 /* AnthropicWebSearchDecodingTests.swift in Sources */,
+				WBBLD000000000000000078 /* CitationPillsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

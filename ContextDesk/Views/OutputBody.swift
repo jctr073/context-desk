@@ -39,17 +39,27 @@ struct OutputBody: View {
             renderBlock(block, registry: registry)
         case .toolCluster(let units):
             if units.count == 1, let unit = units.first {
-                ToolCardView(
-                    id: unit.call.id,
-                    toolName: unit.call.name,
-                    argumentsJSON: unit.call.argumentsJSON,
-                    resultContent: unit.result?.content,
-                    isError: unit.result?.isError ?? false,
-                    palette: palette,
-                    defaultExpanded: shouldDefaultExpand(unit)
-                )
-                .frame(maxWidth: 760, alignment: .leading)
-                .padding(.bottom, 12)
+                if ToolKind.from(name: unit.call.name) == .code {
+                    CodeSessionRollView(units: [unit], palette: palette)
+                        .frame(maxWidth: 760, alignment: .leading)
+                        .padding(.bottom, 12)
+                } else {
+                    ToolCardView(
+                        id: unit.call.id,
+                        toolName: unit.call.name,
+                        argumentsJSON: unit.call.argumentsJSON,
+                        resultContent: unit.result?.content,
+                        isError: unit.result?.isError ?? false,
+                        palette: palette,
+                        defaultExpanded: shouldDefaultExpand(unit)
+                    )
+                    .frame(maxWidth: 760, alignment: .leading)
+                    .padding(.bottom, 12)
+                }
+            } else if units.allSatisfy({ ToolKind.from(name: $0.call.name) == .code }) {
+                CodeSessionRollView(units: units, palette: palette)
+                    .frame(maxWidth: 760, alignment: .leading)
+                    .padding(.bottom, 12)
             } else {
                 ToolGroupView(units: units, palette: palette)
                     .frame(maxWidth: 760, alignment: .leading)

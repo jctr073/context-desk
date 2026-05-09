@@ -508,16 +508,21 @@ struct ToolGroupView: View {
             if expanded {
                 Divider().background(palette.border)
                 VStack(spacing: 8) {
-                    ForEach(Array(units.enumerated()), id: \.offset) { idx, unit in
-                        ToolCardView(
-                            id: unit.call.id,
-                            toolName: unit.call.name,
-                            argumentsJSON: unit.call.argumentsJSON,
-                            resultContent: unit.result?.content,
-                            isError: unit.result?.isError ?? false,
-                            palette: palette,
-                            defaultExpanded: defaultExpanded(for: unit, index: idx)
-                        )
+                    ForEach(Array(ToolUnitWalker.subCluster(units).enumerated()), id: \.offset) { _, sub in
+                        switch sub {
+                        case .codeRun(let codeUnits):
+                            CodeSessionRollView(units: codeUnits, palette: palette)
+                        case .single(let unit):
+                            ToolCardView(
+                                id: unit.call.id,
+                                toolName: unit.call.name,
+                                argumentsJSON: unit.call.argumentsJSON,
+                                resultContent: unit.result?.content,
+                                isError: unit.result?.isError ?? false,
+                                palette: palette,
+                                defaultExpanded: defaultExpanded(for: unit)
+                            )
+                        }
                     }
                 }
                 .padding(8)
@@ -531,16 +536,15 @@ struct ToolGroupView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    /// Expand the first card in the group that has results — that's
-    /// where the smart summary lives.
-    private func defaultExpanded(for unit: ToolUnit, index: Int) -> Bool {
+    /// Expand the first card in the group that has a smart summary.
+    private func defaultExpanded(for unit: ToolUnit) -> Bool {
         guard let result = unit.result, !result.isError else { return false }
         let kind = ToolKind.from(name: unit.call.name)
         guard kind == .webSearch else { return false }
         let hits = ToolResultParser.webSearchHits(from: result.content)
         guard !hits.isEmpty else { return false }
-        // First eligible card only.
-        for prior in units.prefix(index) {
+        for prior in units {
+            if prior.call.id == unit.call.id { return true }
             if let r = prior.result, !r.isError,
                ToolKind.from(name: prior.call.name) == .webSearch,
                !ToolResultParser.webSearchHits(from: r.content).isEmpty {
@@ -668,5 +672,196 @@ enum ToolUnitWalker {
         }
         flush()
         return out
+    }
+
+    /// Sub-cluster within a tool group: a run of consecutive code-execution
+    /// units rolls into a `CodeSessionRollView`; everything else stays a
+    /// single `ToolCardView`.
+    enum SubCluster {
+        case codeRun([ToolUnit])
+        case single(ToolUnit)
+    }
+
+    static func subCluster(_ units: [ToolUnit]) -> [SubCluster] {
+        var out: [SubCluster] = []
+        var codeRun: [ToolUnit] = []
+        func flushCode() {
+            if !codeRun.isEmpty {
+                out.append(.codeRun(codeRun))
+                codeRun.removeAll()
+            }
+        }
+        for u in units {
+            if ToolKind.from(name: u.call.name) == .code {
+                codeRun.append(u)
+            } else {
+                flushCode()
+                out.append(.single(u))
+            }
+        }
+        flushCode()
+        return out
+    }
+}
+
+// MARK: - CodeSessionRollView
+
+/// "Rolled-up" code-execution session — a single collapsible card with
+/// numbered, monospace lines per step. Collapsed by default.
+struct CodeSessionRollView: View {
+    let units: [ToolUnit]
+    let palette: Palette
+
+    @State private var expanded: Bool = false
+
+    private var errorCount: Int {
+        units.reduce(0) { $0 + ((($1.result?.isError) == true) ? 1 : 0) }
+    }
+    private var anyRunning: Bool {
+        units.contains(where: { $0.result == nil })
+    }
+    private var latestLine: String {
+        for unit in units.reversed() {
+            if let line = ToolResultParser.extractedArgument(
+                name: unit.call.name, argumentsJSON: unit.call.argumentsJSON
+            ) {
+                return line
+            }
+        }
+        return ""
+    }
+    private var latestPreview: String {
+        let count = units.count
+        let stepWord = count == 1 ? "step" : "steps"
+        if latestLine.isEmpty { return "\(count) \(stepWord)" }
+        return "\(count) \(stepWord) · last: \(latestLine)"
+    }
+    private var metaText: String {
+        if anyRunning {
+            return errorCount > 0 ? "\(errorCount) errors · running" : "running"
+        }
+        if errorCount > 0 {
+            return "\(errorCount) error\(errorCount == 1 ? "" : "s")"
+        }
+        return ""
+    }
+
+    private static let codeTint = Color(hex: 0xBF5AF2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
+                }
+            if expanded {
+                Divider().background(palette.border)
+                bodyRows
+            }
+        }
+        .background(palette.text.opacity(0.025))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(palette.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Self.codeTint.opacity(0.14))
+                    .frame(width: 24, height: 24)
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Self.codeTint)
+            }
+
+            Text("CODE SESSION")
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(0.5)
+                .foregroundColor(palette.muted)
+                .fixedSize()
+
+            Text(latestPreview)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(palette.text.opacity(0.55))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !metaText.isEmpty {
+                Text(metaText)
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundColor(errorCount > 0 ? Color(hex: 0xFF453A) : palette.muted)
+                    .fixedSize()
+            }
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(palette.muted)
+                .rotationEffect(.degrees(expanded ? 0 : -90))
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 10)
+    }
+
+    private var bodyRows: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(units.enumerated()), id: \.offset) { idx, unit in
+                    row(idx: idx + 1, unit: unit)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .frame(maxHeight: 280)
+        .background(Color.black.opacity(0.18))
+    }
+
+    @ViewBuilder
+    private func row(idx: Int, unit: ToolUnit) -> some View {
+        let line = ToolResultParser.extractedArgument(
+            name: unit.call.name, argumentsJSON: unit.call.argumentsJSON
+        ) ?? ""
+        let isError = (unit.result?.isError ?? false)
+        let isComment = line.trimmingCharacters(in: .whitespaces).hasPrefix("#")
+
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(String(format: "%02d", idx))
+                .font(.system(size: 12, design: .monospaced))
+                .monospacedDigit()
+                .foregroundColor(isError ? Color(hex: 0xFF453A) : palette.text.opacity(0.25))
+                .frame(width: 28, alignment: .trailing)
+
+            Text(line)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(rowColor(isError: isError, isComment: isComment))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+
+            if isError {
+                Text("\u{2715}")
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundColor(Color(hex: 0xFF453A))
+            } else if unit.result == nil {
+                Text("…")
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundColor(palette.muted)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 3)
+    }
+
+    private func rowColor(isError: Bool, isComment: Bool) -> Color {
+        if isError { return Color(hex: 0xFF8E88) }
+        if isComment { return palette.text.opacity(0.45) }
+        return palette.text
     }
 }

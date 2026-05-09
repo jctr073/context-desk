@@ -2,10 +2,13 @@ import XCTest
 @testable import ContextDesk
 
 final class OpenAIStreamDecodingTests: XCTestCase {
+    private let emitItemID = "fc_emit"
+
     func testHappyPathReconstructsBlocks() async throws {
         let json = #"{"blocks":[{"kind":"heading","text":"Title"},{"kind":"paragraph","text":"Body."}]}"#
         let events = [
-            deltaEvent(json),
+            outputItemAddedEvent(itemID: emitItemID),
+            argumentsDeltaEvent(json, itemID: emitItemID),
             completedEvent(),
         ]
 
@@ -21,7 +24,8 @@ final class OpenAIStreamDecodingTests: XCTestCase {
         let json = #"{"blocks":[{"kind":"heading","text":"Title"},{"kind":"paragraph","text":"Body."}]}"#
         let chunks = splitIntoChunks(json, count: 8)
 
-        var events: [SSEEvent] = chunks.map { deltaEvent($0) }
+        var events: [SSEEvent] = [outputItemAddedEvent(itemID: emitItemID)]
+        events.append(contentsOf: chunks.map { argumentsDeltaEvent($0, itemID: emitItemID) })
         events.append(completedEvent())
 
         let snapshots = try await collect(events)
@@ -43,7 +47,10 @@ final class OpenAIStreamDecodingTests: XCTestCase {
 
     func testStreamEndWithoutCompletedStillYieldsFinalSnapshot() async throws {
         let json = #"{"blocks":[{"kind":"paragraph","text":"Hi."}]}"#
-        let events = [deltaEvent(json)]
+        let events = [
+            outputItemAddedEvent(itemID: emitItemID),
+            argumentsDeltaEvent(json, itemID: emitItemID),
+        ]
 
         let snapshots = try await collect(events)
         XCTAssertEqual(snapshots.last, [.paragraph(text: "Hi.")])
@@ -52,7 +59,8 @@ final class OpenAIStreamDecodingTests: XCTestCase {
     func testErrorEventThrowsApiError() async throws {
         let errorPayload = #"{"type":"response.error","error":{"message":"rate limit hit"}}"#
         let events = [
-            deltaEvent(#"{"blocks":[{"kind":"paragraph","text":"part"#),
+            outputItemAddedEvent(itemID: emitItemID),
+            argumentsDeltaEvent(#"{"blocks":[{"kind":"paragraph","text":"part"#, itemID: emitItemID),
             SSEEvent(event: nil, data: errorPayload),
         ]
 
@@ -72,14 +80,28 @@ final class OpenAIStreamDecodingTests: XCTestCase {
             SSEEvent(event: nil, data: #"{"type":"response.created"}"#),
             SSEEvent(event: nil, data: #"{"type":"response.in_progress"}"#),
             SSEEvent(event: nil, data: #"{"type":"response.reasoning_summary_text.delta","delta":"thinking..."}"#),
-            SSEEvent(event: nil, data: #"{"type":"response.output_item.added"}"#),
-            deltaEvent(json),
-            SSEEvent(event: nil, data: #"{"type":"response.output_text.done"}"#),
+            outputItemAddedEvent(itemID: emitItemID),
+            argumentsDeltaEvent(json, itemID: emitItemID),
+            SSEEvent(event: nil, data: #"{"type":"response.function_call_arguments.done","item_id":"\#(emitItemID)"}"#),
             completedEvent(),
         ]
 
         let snapshots = try await collect(events)
         XCTAssertEqual(snapshots.last, [.heading(text: "Hello")])
+    }
+
+    func testIgnoresArgumentDeltasFromOtherTools() async throws {
+        // If a future build registers additional tools, their argument
+        // deltas must not pollute the emit_output JSON parser.
+        let json = #"{"blocks":[{"kind":"paragraph","text":"hi"}]}"#
+        let events: [SSEEvent] = [
+            outputItemAddedEvent(itemID: emitItemID),
+            argumentsDeltaEvent(#"{"q":"unused"}"#, itemID: "fc_other"),
+            argumentsDeltaEvent(json, itemID: emitItemID),
+            completedEvent(),
+        ]
+        let snapshots = try await collect(events)
+        XCTAssertEqual(snapshots.last, [.paragraph(text: "hi")])
     }
 
     private func collect(_ events: [SSEEvent]) async throws -> [[OutputBlock]] {
@@ -91,9 +113,15 @@ final class OpenAIStreamDecodingTests: XCTestCase {
         return out
     }
 
-    private func deltaEvent(_ delta: String) -> SSEEvent {
-        let escaped = jsonEscape(delta)
-        return SSEEvent(event: nil, data: #"{"type":"response.output_text.delta","delta":"# + escaped + "}")
+    private func argumentsDeltaEvent(_ delta: String, itemID: String) -> SSEEvent {
+        let escapedDelta = jsonEscape(delta)
+        let data = #"{"type":"response.function_call_arguments.delta","item_id":"\#(itemID)","delta":\#(escapedDelta)}"#
+        return SSEEvent(event: nil, data: data)
+    }
+
+    private func outputItemAddedEvent(itemID: String) -> SSEEvent {
+        let data = #"{"type":"response.output_item.added","item":{"type":"function_call","name":"\#(StructuredOutputSchema.toolName)","id":"\#(itemID)","call_id":"call_abc"}}"#
+        return SSEEvent(event: nil, data: data)
     }
 
     private func completedEvent() -> SSEEvent {

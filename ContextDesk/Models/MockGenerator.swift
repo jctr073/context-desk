@@ -96,6 +96,9 @@ enum MockGenerator {
             case .bulletList(let it):  return it.joined(separator: " ")
             case .table(_, let rows):  return rows.flatMap { $0 }.joined(separator: " ")
             case .codeBlock(_, let c): return c
+            case .toolCall:            return ""
+            case .toolResult(_, let content, _): return content
+            case .unknown:             return ""
             }
         }.joined(separator: " ")
     }

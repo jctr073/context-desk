@@ -63,6 +63,12 @@
 		WBBLD000000000000000065 /* AnthropicStreamDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */; };
 		WBBLD000000000000000054 /* SubmitPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000054 /* SubmitPromptTests.swift */; };
 		WBBLD000000000000000066 /* HistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000066 /* HistoryStoreTests.swift */; };
+		WBBLD000000000000000070 /* OpenAIRequestEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000070 /* OpenAIRequestEncodingTests.swift */; };
+		WBBLD000000000000000071 /* AnthropicRequestEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000071 /* AnthropicRequestEncodingTests.swift */; };
+		WBBLD000000000000000072 /* ToolCallReplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000072 /* ToolCallReplay.swift */; };
+		WBBLD000000000000000073 /* ToolCallReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000073 /* ToolCallReplayTests.swift */; };
+		WBBLD000000000000000074 /* OpenAIWebSearchDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */; };
+		WBBLD000000000000000075 /* AnthropicWebSearchDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */; };
 		WBBLD000000000000000067 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000067 /* Conversation.swift */; };
 		WBBLD000000000000000068 /* ContextSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000068 /* ContextSheet.swift */; };
 /* End PBXBuildFile section */
@@ -124,6 +130,12 @@
 		WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicStreamDecodingTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000054 /* SubmitPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubmitPromptTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000066 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000070 /* OpenAIRequestEncodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIRequestEncodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000071 /* AnthropicRequestEncodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicRequestEncodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000072 /* ToolCallReplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallReplay.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000073 /* ToolCallReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallReplayTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIWebSearchDecodingTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicWebSearchDecodingTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000067 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000068 /* ContextSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextSheet.swift; sourceTree = "<group>"; };
 		WBPRODUCT0000000000000001 /* ContextDesk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ContextDesk.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -171,6 +183,11 @@
 				WBFILE00000000000000064 /* OpenAIStreamDecodingTests.swift */,
 				WBFILE00000000000000065 /* AnthropicStreamDecodingTests.swift */,
 				WBFILE00000000000000066 /* HistoryStoreTests.swift */,
+				WBFILE00000000000000070 /* OpenAIRequestEncodingTests.swift */,
+				WBFILE00000000000000071 /* AnthropicRequestEncodingTests.swift */,
+				WBFILE00000000000000073 /* ToolCallReplayTests.swift */,
+				WBFILE00000000000000074 /* OpenAIWebSearchDecodingTests.swift */,
+				WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */,
 			);
 			path = ContextDeskTests;
 			sourceTree = "<group>";
@@ -228,6 +245,7 @@
 				WBFILE00000000000000037 /* AttachedImage.swift */,
 				WBFILE00000000000000060 /* SSEEventStream.swift */,
 				WBFILE00000000000000061 /* StreamingOutputParser.swift */,
+				WBFILE00000000000000072 /* ToolCallReplay.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -429,6 +447,7 @@
 				WBBLD000000000000000044 /* StructuredOutputSchema.swift in Sources */,
 				WBBLD000000000000000060 /* SSEEventStream.swift in Sources */,
 				WBBLD000000000000000061 /* StreamingOutputParser.swift in Sources */,
+				WBBLD000000000000000072 /* ToolCallReplay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -446,6 +465,11 @@
 				WBBLD000000000000000064 /* OpenAIStreamDecodingTests.swift in Sources */,
 				WBBLD000000000000000065 /* AnthropicStreamDecodingTests.swift in Sources */,
 				WBBLD000000000000000066 /* HistoryStoreTests.swift in Sources */,
+				WBBLD000000000000000070 /* OpenAIRequestEncodingTests.swift in Sources */,
+				WBBLD000000000000000071 /* AnthropicRequestEncodingTests.swift in Sources */,
+				WBBLD000000000000000073 /* ToolCallReplayTests.swift in Sources */,
+				WBBLD000000000000000074 /* OpenAIWebSearchDecodingTests.swift in Sources */,
+				WBBLD000000000000000075 /* AnthropicWebSearchDecodingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -27,6 +27,13 @@ extension OutputBlock {
         case .codeBlock(let language, let code):
             let fence = "```" + (language ?? "")
             return "\(fence)\n\(code)\n```"
+        case .toolCall(_, let name, let argumentsJSON):
+            return "> **Tool call:** `\(name)`\n> ```\n> \(argumentsJSON)\n> ```"
+        case .toolResult(_, let content, let isError):
+            let label = isError ? "Tool error" : "Tool result"
+            return "> **\(label):** \(content)"
+        case .unknown(let kind, _):
+            return "<!-- unsupported block: \(kind) -->"
         }
     }
 
@@ -49,6 +56,12 @@ extension OutputBlock {
             return "```\n\(tableText)\n```"
         case .codeBlock(_, let code):
             return "```\n\(code)\n```"
+        case .toolCall(_, let name, _):
+            return "_(tool call: \(name))_"
+        case .toolResult(_, let content, let isError):
+            return isError ? "_(tool error: \(content))_" : "_(tool result: \(content))_"
+        case .unknown(let kind, _):
+            return "[unsupported: \(kind)]"
         }
     }
 

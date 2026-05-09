@@ -9,21 +9,27 @@ final class StructuredOutputSchemaTests: XCTestCase {
         XCTAssertEqual(schema["required"] as? [String], ["blocks"])
     }
 
-    func testBlocksItemsHasFiveAnyOfBranches() throws {
+    func testBlocksItemsHasSevenAnyOfBranches() throws {
+        // 5 prose kinds + toolCall + toolResult. The tool kinds are allowed
+        // by the schema but not yet emitted by the model — the system prompt
+        // still instructs prose-only output.
         let schema = StructuredOutputSchema.schema
         let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
         let blocks = try XCTUnwrap(properties["blocks"] as? [String: Any])
         XCTAssertEqual(blocks["type"] as? String, "array")
         let items = try XCTUnwrap(blocks["items"] as? [String: Any])
         let anyOf = try XCTUnwrap(items["anyOf"] as? [[String: Any]])
-        XCTAssertEqual(anyOf.count, 5)
+        XCTAssertEqual(anyOf.count, 7)
 
         let kinds = anyOf.compactMap { branch -> String? in
             let props = branch["properties"] as? [String: Any]
             let kind = props?["kind"] as? [String: Any]
             return kind?["const"] as? String
         }
-        XCTAssertEqual(Set(kinds), Set(["paragraph", "heading", "bulletList", "table", "codeBlock"]))
+        XCTAssertEqual(Set(kinds), Set([
+            "paragraph", "heading", "bulletList", "table", "codeBlock",
+            "toolCall", "toolResult",
+        ]))
     }
 
     func testEveryBranchIsStrictObject() throws {

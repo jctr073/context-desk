@@ -414,8 +414,9 @@ private struct AssistantBlocks: View {
                 }
             }
             .padding(.bottom, 10)
-        case .table, .codeBlock:
-            // Reuse the rich renderer used by the output canvas for tables / code.
+        case .table, .codeBlock, .toolCall, .toolResult, .unknown:
+            // Reuse the rich renderer used by the output canvas for tables /
+            // code / tool activity / forward-compat unknown blocks.
             OutputBody(blocks: [block], renderMode: .rendered, containerFormat: .markdown, palette: palette)
                 .padding(.bottom, 10)
         }

@@ -73,6 +73,30 @@ struct OutputBody: View {
         case .codeBlock(let language, let code):
             CodeBlock(language: language, code: code, palette: palette)
                 .padding(.bottom, 12)
+
+        case .toolCall(_, let name, let argumentsJSON):
+            ToolActivityBlock(
+                title: "Tool call",
+                name: name,
+                detail: argumentsJSON,
+                isError: false,
+                palette: palette
+            )
+            .padding(.bottom, 12)
+
+        case .toolResult(_, let content, let isError):
+            ToolActivityBlock(
+                title: isError ? "Tool error" : "Tool result",
+                name: nil,
+                detail: content,
+                isError: isError,
+                palette: palette
+            )
+            .padding(.bottom, 12)
+
+        case .unknown(let kind, _):
+            UnsupportedBlock(kind: kind, palette: palette)
+                .padding(.bottom, 12)
         }
     }
 
@@ -216,6 +240,65 @@ private struct TableBlock: View {
                 .stroke(palette.border, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct ToolActivityBlock: View {
+    let title: String
+    let name: String?
+    let detail: String
+    let isError: Bool
+    let palette: Palette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text(title.uppercased())
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundColor(isError ? .red : palette.muted)
+                if let name {
+                    Text(name)
+                        .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+                        .foregroundColor(palette.text)
+                }
+            }
+            if !detail.isEmpty {
+                Text(detail)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(palette.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.surfaceInset)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(palette.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+}
+
+private struct UnsupportedBlock: View {
+    let kind: String
+    let palette: Palette
+
+    var body: some View {
+        Text("Unsupported block: \(kind)")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(palette.muted)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(palette.surfaceInset)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(palette.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 

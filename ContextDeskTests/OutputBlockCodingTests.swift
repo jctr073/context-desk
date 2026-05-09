@@ -54,6 +54,67 @@ final class OutputBlockCodingTests: XCTestCase {
         XCTAssertEqual(block, .codeBlock(language: nil, code: "x"))
     }
 
+    func testToolCallRoundTrip() throws {
+        try assertRoundTrip(.toolCall(
+            id: "call_abc",
+            name: "web_search",
+            argumentsJSON: #"{"q":"swift"}"#
+        ))
+    }
+
+    func testToolResultRoundTrip() throws {
+        try assertRoundTrip(.toolResult(
+            callID: "call_abc",
+            content: "1 result found",
+            isError: false
+        ))
+    }
+
+    func testToolResultErrorRoundTrip() throws {
+        try assertRoundTrip(.toolResult(
+            callID: "call_xyz",
+            content: "rate limited",
+            isError: true
+        ))
+    }
+
+    func testDecodesCanonicalToolCallJSON() throws {
+        let json = #"{"arguments":"{\"q\":\"x\"}","id":"c1","kind":"toolCall","name":"search"}"#
+        let block = try decoder.decode(OutputBlock.self, from: Data(json.utf8))
+        XCTAssertEqual(block, .toolCall(id: "c1", name: "search", argumentsJSON: #"{"q":"x"}"#))
+    }
+
+    func testUnknownKindDecodesAsForwardCompatBlock() throws {
+        let json = #"{"kind":"futureWidget","label":"Beta","count":3}"#
+        let block = try decoder.decode(OutputBlock.self, from: Data(json.utf8))
+        guard case .unknown(let kind, _) = block else {
+            return XCTFail("expected .unknown, got \(block)")
+        }
+        XCTAssertEqual(kind, "futureWidget")
+    }
+
+    func testUnknownKindRoundTripsAllFields() throws {
+        // A future build must be able to re-save a conversation containing a
+        // block kind this build doesn't understand without losing fields.
+        let json = #"{"count":3,"kind":"futureWidget","label":"Beta","nested":{"flag":true,"items":[1,2.5,"x",null]}}"#
+        let block = try decoder.decode(OutputBlock.self, from: Data(json.utf8))
+        let re = try encoder.encode(block)
+        let reEncoded = try XCTUnwrap(String(data: re, encoding: .utf8))
+        // sortedKeys + the original sorted-key fixture should match byte-for-byte.
+        XCTAssertEqual(reEncoded, json)
+    }
+
+    func testUnknownKindSurvivesAlongsideKnownBlocks() throws {
+        let json = #"{"blocks":[{"kind":"paragraph","text":"hi"},{"kind":"futureWidget","data":42}]}"#
+        let decoded = try decoder.decode(StructuredOutput.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.blocks.count, 2)
+        XCTAssertEqual(decoded.blocks[0], .paragraph(text: "hi"))
+        guard case .unknown(let kind, _) = decoded.blocks[1] else {
+            return XCTFail("expected .unknown for second block")
+        }
+        XCTAssertEqual(kind, "futureWidget")
+    }
+
     func testStructuredOutputWrapperRoundTrip() throws {
         let blocks: [OutputBlock] = [
             .heading(text: "Title"),

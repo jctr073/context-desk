@@ -82,7 +82,6 @@ final class HistoryStoreTests: XCTestCase {
             output: [.paragraph(text: "out: \(input)")],
             operationID: "rewrite",
             operationLabel: "Rewrite",
-            formats: [.paragraphs],
             modelID: "test-model"
         )
     }

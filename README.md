@@ -163,7 +163,6 @@ ContextDesk/
     Layout.swift            — legacy pane-layout enum
   Models/
     Operation.swift         — chat and writing mode operations
-    OutputFormat.swift      — Auto / Paragraphs / Bullets / Tables chip state
     OutputContainerFormat.swift — Markdown / Slack raw-output options
     OutputBlock.swift       — paragraph | heading | bulletList | table | codeBlock
     OutputBlock+Markdown.swift — Markdown export for rendered output blocks

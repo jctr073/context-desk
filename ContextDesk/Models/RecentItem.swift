@@ -12,7 +12,6 @@ struct RecentItem: Identifiable, Hashable, Codable {
     let operationID: String
     let operationLabel: String
     let mode: WritingMode
-    let formats: Set<OutputFormat>
     let containerFormat: OutputContainerFormat
     let modelID: String
 
@@ -27,7 +26,6 @@ struct RecentItem: Identifiable, Hashable, Codable {
         operationID: String,
         operationLabel: String,
         mode: WritingMode = .writing,
-        formats: Set<OutputFormat>,
         containerFormat: OutputContainerFormat = .markdown,
         modelID: String
     ) {
@@ -41,7 +39,6 @@ struct RecentItem: Identifiable, Hashable, Codable {
         self.operationID = operationID
         self.operationLabel = operationLabel
         self.mode = mode
-        self.formats = formats
         self.containerFormat = containerFormat
         self.modelID = modelID
     }
@@ -70,7 +67,6 @@ struct RecentItem: Identifiable, Hashable, Codable {
             self.operationLabel = legacyOp.label
             self.mode = .writing
         }
-        self.formats = try c.decode(Set<OutputFormat>.self, forKey: .formats)
         self.containerFormat = (try? c.decode(OutputContainerFormat.self, forKey: .containerFormat)) ?? .markdown
         self.modelID = try c.decode(String.self, forKey: .modelID)
     }
@@ -87,14 +83,13 @@ struct RecentItem: Identifiable, Hashable, Codable {
         try c.encode(operationID, forKey: .operationID)
         try c.encode(operationLabel, forKey: .operationLabel)
         try c.encode(mode, forKey: .mode)
-        try c.encode(formats, forKey: .formats)
         try c.encode(containerFormat, forKey: .containerFormat)
         try c.encode(modelID, forKey: .modelID)
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, input, context, inputImages, contextImages
-        case output, operation, operationID, operationLabel, mode, formats, containerFormat, modelID
+        case output, operation, operationID, operationLabel, mode, containerFormat, modelID
     }
 
     var title: String {
@@ -158,11 +153,8 @@ struct RecentItem: Identifiable, Hashable, Codable {
     }
 
     var actions: [String] {
-        let selectedFormats = OutputFormat.allCases
-            .filter { formats.contains($0) }
-            .map(\.label)
         let formatLabel = containerFormat == .markdown ? [] : [containerFormat.label]
-        return [operationLabel] + formatLabel + selectedFormats
+        return [operationLabel] + formatLabel
     }
 
     /// Resolve the stored operation back into an `Operation` if possible.

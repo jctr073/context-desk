@@ -31,9 +31,6 @@ final class AppState: ObservableObject {
     @Published var chatOp: ChatOp = .ask {
         didSet { syncActiveConversationMeta() }
     }
-    @Published var fmts: Set<OutputFormat> = [] {
-        didSet { syncActiveConversationMeta() }
-    }
     @Published var containerFormat: OutputContainerFormat = .markdown {
         didSet { syncActiveConversationMeta() }
     }
@@ -224,12 +221,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    var isAutomaticFormat: Bool { fmts.isEmpty }
-    func setAutomaticFormat() { fmts.removeAll() }
-    func toggleFormat(_ fmt: OutputFormat) {
-        if fmts.contains(fmt) { fmts.remove(fmt) } else { fmts.insert(fmt) }
-    }
-
     // MARK: - Conversation lifecycle
 
     func toggleHistoryVisible() { historyVisible.toggle() }
@@ -241,7 +232,6 @@ final class AppState: ObservableObject {
         let convo = Conversation(
             modelID: model.id,
             operationID: activeOperation.id,
-            formats: fmts,
             containerFormat: containerFormat
         )
         conversations.insert(convo, at: 0)
@@ -269,7 +259,6 @@ final class AppState: ObservableObject {
         case .chat:
             chatOp = ChatOp(rawValue: convo.operationID) ?? .ask
         }
-        fmts = convo.formats
         containerFormat = convo.containerFormat
         customInstructions = convo.customInstructions
         contextText = convo.contextText
@@ -335,7 +324,6 @@ final class AppState: ObservableObject {
         var convo = conversations[idx]
         convo.mode = mode
         convo.operationID = activeOperation.id
-        convo.formats = fmts
         convo.containerFormat = containerFormat
         convo.customInstructions = customInstructions
         convo.contextText = contextText
@@ -464,7 +452,6 @@ final class AppState: ObservableObject {
     private func startMockStream(userText: String, assistantIdx: Int) {
         let snapshotOp = activeOperation
         let snapshotMode = mode
-        let snapshotFmts = fmts
         let snapshotContainer = containerFormat
         let snapshotModel = model
         running = true
@@ -476,7 +463,6 @@ final class AppState: ObservableObject {
                 input: userText.isEmpty ? "image" : userText,
                 operation: snapshotOp,
                 mode: snapshotMode,
-                fmts: snapshotFmts,
                 containerFormat: snapshotContainer,
                 model: snapshotModel
             )

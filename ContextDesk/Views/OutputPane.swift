@@ -131,16 +131,6 @@ struct OutputCanvas: View {
 
     private var formatToolbar: some View {
         HStack(spacing: 4) {
-            FormatChip(label: "Auto",
-                       icon: "sparkles",
-                       isActive: state.isAutomaticFormat,
-                       palette: palette) { state.setAutomaticFormat() }
-            ForEach(OutputFormat.allCases) { fmt in
-                FormatChip(label: fmt.label,
-                           icon: fmt.sfSymbol,
-                           isActive: state.fmts.contains(fmt),
-                           palette: palette) { state.toggleFormat(fmt) }
-            }
             Spacer()
             SegmentedToggle(
                 options: OutputContainerFormat.allCases.filter { $0.isAvailable },
@@ -238,37 +228,3 @@ struct OutputCanvas: View {
     }
 }
 
-private struct FormatChip: View {
-    let label: String
-    let icon: String?
-    let isActive: Bool
-    let palette: Palette
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Group {
-                if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 11, weight: .medium))
-                } else {
-                    Text(label)
-                        .font(.system(size: 11, weight: .medium))
-                }
-            }
-            .foregroundColor(isActive ? palette.chipActiveText : palette.muted)
-            .frame(width: 24, height: 24)
-            .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(isActive ? palette.chipActive : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .stroke(isActive ? palette.chipActive : palette.chipBorder, lineWidth: 0.5)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(label)
-    }
-}

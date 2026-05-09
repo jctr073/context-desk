@@ -6,16 +6,11 @@ enum MockGenerator {
     static func generate(input: String,
                          operation: Operation,
                          mode: WritingMode = .writing,
-                         fmts: Set<OutputFormat>,
                          containerFormat: OutputContainerFormat = .markdown,
                          model: AIModel) -> [OutputBlock] {
         guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return []
         }
-
-        let wantBullets = fmts.contains(.bullets)
-        let wantTable   = fmts.contains(.tables)
-        let wantParas   = fmts.contains(.paragraphs) || (!wantBullets && !wantTable)
 
         let cleaned = "Our team has been heads-down on the new dashboard for several weeks, and we're finally hitting a stride. Engineering is largely complete; design is still iterating on a handful of details. I'd like to ship a closed beta to a small cohort of customers next week so we can gather feedback before the full launch. Let me know your read \u{2014} and flag any blockers I should be tracking."
 
@@ -37,35 +32,7 @@ enum MockGenerator {
             body = chatStub(for: chatOp, input: input)
         }
 
-        var out: [OutputBlock] = []
-        if wantParas {
-            out.append(.paragraph(text: containerFormat == .slack ? slackifyInline(body) : body))
-        }
-
-        if wantBullets {
-            out.append(.heading(text: "Key points"))
-            out.append(.bulletList(items: [
-                containerFormat == .slack ? "*Engineering* is largely complete; design is finalizing details." : "Engineering is largely complete; design is finalizing details.",
-                "Closed beta proposed for next week with ~25 customers.",
-                "Beta covers activity feed, filter rail, and saved views.",
-                "Five-day window, then go/no-go on GA.",
-            ]))
-        }
-
-        if wantTable {
-            out.append(.heading(text: "Status by workstream"))
-            out.append(.table(
-                head: ["Workstream", "Owner", "Status", "Risk"],
-                rows: [
-                    ["Engineering", "Priya",  "Code complete",       "Low"],
-                    ["Design",      "Marcus", "Polish in flight",    "Low"],
-                    ["Beta cohort", "Jen",    "18 / 25 confirmed",   "Med"],
-                    ["Docs & FAQ",  "Theo",   "Drafting",            "Med"],
-                ]
-            ))
-        }
-
-        return out
+        return [.paragraph(text: containerFormat == .slack ? slackifyInline(body) : body)]
     }
 
     private static func slackifyInline(_ text: String) -> String {

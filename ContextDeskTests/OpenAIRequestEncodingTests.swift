@@ -25,9 +25,9 @@ final class OpenAIRequestEncodingTests: XCTestCase {
         XCTAssertNil(payload["text"], "response_format replaced by forced function-call")
 
         let tools = try XCTUnwrap(payload["tools"] as? [[String: Any]])
-        XCTAssertEqual(tools.count, 2)
+        XCTAssertEqual(tools.count, 1)
 
-        // First tool: emit_output (custom function).
+        // emit_output (custom function) is always present.
         let emit = tools[0]
         XCTAssertEqual(emit["type"] as? String, "function")
         XCTAssertEqual(emit["name"] as? String, StructuredOutputSchema.toolName)
@@ -37,17 +37,27 @@ final class OpenAIRequestEncodingTests: XCTestCase {
         let reencoded = try JSONSerialization.data(withJSONObject: parameters, options: [.sortedKeys])
         XCTAssertEqual(reencoded, StructuredOutputSchema.schemaData)
 
-        // Second tool: hosted web_search.
+        let toolChoice = try XCTUnwrap(payload["tool_choice"] as? [String: Any])
+        XCTAssertEqual(toolChoice["type"] as? String, "function")
+        XCTAssertEqual(toolChoice["name"] as? String, StructuredOutputSchema.toolName)
+    }
+
+    func testSubmitRequestAddsWebSearchOnlyWhenEnabled() throws {
+        let prompt = makePrompt(model: .gpt55Medium, input: "Hello", webAccessEnabled: true)
+        let payload = try encode(OpenAISubmitRequest(prompt: prompt, stream: false))
+
+        let tools = try XCTUnwrap(payload["tools"] as? [[String: Any]])
+        XCTAssertEqual(tools.count, 2)
+
         let web = tools[1]
         XCTAssertEqual(web["type"] as? String, "web_search")
         XCTAssertNil(web["name"], "hosted tools have no function name")
         XCTAssertNil(web["parameters"], "hosted tools have no schema")
-        XCTAssertNil(web["allowed_domains"], "no domain filter set in this branch")
+        XCTAssertNil(web["allowed_domains"])
         XCTAssertNil(web["blocked_domains"])
 
-        let toolChoice = try XCTUnwrap(payload["tool_choice"] as? [String: Any])
-        XCTAssertEqual(toolChoice["type"] as? String, "function")
-        XCTAssertEqual(toolChoice["name"] as? String, StructuredOutputSchema.toolName)
+        let instructions = try XCTUnwrap(payload["instructions"] as? String)
+        XCTAssertTrue(instructions.contains("Do not include API keys"))
     }
 
     func testSubmitRequestStreamFlag() throws {
@@ -105,16 +115,34 @@ final class OpenAIRequestEncodingTests: XCTestCase {
 
         XCTAssertNil(payload["text"])
         let tools = try XCTUnwrap(payload["tools"] as? [[String: Any]])
-        XCTAssertEqual(tools.count, 2)
+        XCTAssertEqual(tools.count, 1)
         XCTAssertEqual(tools[0]["name"] as? String, StructuredOutputSchema.toolName)
         let parameters = try XCTUnwrap(tools[0]["parameters"])
         let reencoded = try JSONSerialization.data(withJSONObject: parameters, options: [.sortedKeys])
         XCTAssertEqual(reencoded, StructuredOutputSchema.schemaData)
-        XCTAssertEqual(tools[1]["type"] as? String, "web_search")
 
         let toolChoice = try XCTUnwrap(payload["tool_choice"] as? [String: Any])
         XCTAssertEqual(toolChoice["type"] as? String, "function")
         XCTAssertEqual(toolChoice["name"] as? String, StructuredOutputSchema.toolName)
+    }
+
+    func testChatRequestAddsWebSearchOnlyWhenEnabled() throws {
+        let chat = ChatSubmitPrompt(
+            model: .gpt55Medium,
+            operation: WritingOp.rephrase,
+            customInstructions: "",
+            turns: [ChatTurn(role: .user, text: "latest?")],
+            webAccessEnabled: true
+        )
+        let payload = try encode(OpenAIChatRequest(prompt: chat, stream: true))
+
+        let tools = try XCTUnwrap(payload["tools"] as? [[String: Any]])
+        XCTAssertEqual(tools.count, 2)
+        XCTAssertEqual(tools[0]["name"] as? String, StructuredOutputSchema.toolName)
+        XCTAssertEqual(tools[1]["type"] as? String, "web_search")
+
+        let instructions = try XCTUnwrap(payload["instructions"] as? String)
+        XCTAssertTrue(instructions.contains("minimal public-safe query"))
     }
 
     // MARK: - Helpers
@@ -128,7 +156,8 @@ final class OpenAIRequestEncodingTests: XCTestCase {
     private func makePrompt(
         model: AIModel,
         input: String,
-        inputImages: [AttachedImage] = []
+        inputImages: [AttachedImage] = [],
+        webAccessEnabled: Bool = false
     ) -> SubmitPrompt {
         SubmitPrompt(
             model: model,
@@ -136,7 +165,8 @@ final class OpenAIRequestEncodingTests: XCTestCase {
             input: input,
             context: "",
             customInstructions: "",
-            inputImages: inputImages
+            inputImages: inputImages,
+            webAccessEnabled: webAccessEnabled
         )
     }
 

@@ -165,4 +165,28 @@ final class CitationPillsTests: XCTestCase {
         XCTAssertEqual(reg.lookup("1")?.title, "A")
         XCTAssertEqual(reg.lookup("2")?.title, "B")
     }
+
+    // MARK: ExternalURLPolicy
+
+    func testExternalURLPolicyAllowsHttpAndHttps() {
+        XCTAssertEqual(
+            ExternalURLPolicy.webURL(from: " https://example.com/path ")?.absoluteString,
+            "https://example.com/path"
+        )
+        XCTAssertEqual(
+            ExternalURLPolicy.webURL(from: "http://example.com")?.host,
+            "example.com"
+        )
+    }
+
+    func testExternalURLPolicyRejectsNonWebSchemes() {
+        XCTAssertNil(ExternalURLPolicy.webURL(from: "file:///etc/passwd"))
+        XCTAssertNil(ExternalURLPolicy.webURL(from: "x-apple.systempreferences:com.apple.preference.security"))
+        XCTAssertNil(ExternalURLPolicy.webURL(from: "mailto:test@example.com"))
+    }
+
+    func testExternalURLPolicyRequiresHost() {
+        XCTAssertNil(ExternalURLPolicy.webURL(from: "https:///missing-host"))
+        XCTAssertNil(ExternalURLPolicy.webURL(from: "not a url"))
+    }
 }

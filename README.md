@@ -30,6 +30,8 @@ deterministic mock output for now.
   operation.
 - Conversation-wide context text and images that are sent with each live
   request in that conversation.
+- Per-conversation Web toggle for hosted provider web search/fetch. It defaults
+  off and adds safety guidance when enabled.
 - Input and context image attachments via picker, paste, or drag and drop.
 - Attached images are previewed inline, can be opened in a lightbox, and are
   included in live OpenAI / Anthropic requests.
@@ -208,13 +210,18 @@ duplicating it into every saved message.
 
 `AIWritingService` builds one provider-neutral `ChatSubmitPrompt`: transcript
 turns, operation instructions, conversation-wide custom instructions, attached
-images, and the selected model. OpenAI receives `instructions` plus a multi-turn
-Responses API `input`, `text.format` JSON schema, `stream: true`, and
-`reasoning.effort` for GPT-5.5 effort variants. Anthropic receives the same
-system guidance through Messages API `system`, image/text content blocks,
-`stream: true`, and a single structured-output tool. Claude Opus 4.7 effort
-variants are sent as Anthropic `output_config.effort` with adaptive thinking
-enabled.
+images, the per-conversation Web toggle, and the selected model. OpenAI receives
+`instructions` plus a multi-turn Responses API `input`, a forced `emit_output`
+function tool, `stream: true`, and `reasoning.effort` for GPT-5.5 effort
+variants. Anthropic receives the same system guidance through Messages API
+`system`, image/text content blocks, `stream: true`, and the same
+structured-output tool. Claude Opus 4.7 effort variants are sent as Anthropic
+`output_config.effort` with adaptive thinking enabled.
+
+Hosted OpenAI `web_search` and Anthropic `web_search` / `web_fetch` tools are
+registered only when the conversation Web toggle is enabled. Tool telemetry
+rendered in the UI comes from provider tool events; the final-answer schema does
+not allow the model to invent tool cards.
 
 Both live providers stream Server-Sent Events into `StreamingOutputParser`, which
 turns partial JSON-schema/tool-output deltas into `[OutputBlock]` snapshots for

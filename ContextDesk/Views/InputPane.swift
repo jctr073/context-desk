@@ -61,6 +61,7 @@ struct ChatPane: View {
                 onSelectWritingOp: { state.toggleOp($0) },
                 onSelectChatOp: { state.setChatOp($0) }
             )
+            webButton
             instructionsButton
             contextButton
         }
@@ -70,6 +71,43 @@ struct ChatPane: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(palette.border).frame(height: 1)
         }
+    }
+
+    @ViewBuilder
+    private var webButton: some View {
+        let active = state.webAccessEnabled
+        Button {
+            state.webAccessEnabled.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                    .font(.system(size: 11, weight: .medium))
+                Text("Web")
+                    .font(.system(size: 12, weight: .medium))
+                if active {
+                    Circle()
+                        .fill(palette.accent)
+                        .frame(width: 5, height: 5)
+                }
+            }
+            .foregroundColor(palette.text)
+            .padding(.horizontal, 11)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(palette.chip)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(active ? palette.accent.opacity(0.6) : palette.chipBorder,
+                            lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(active
+              ? "Web search and fetch are enabled for this conversation"
+              : "Enable web search and fetch for this conversation")
     }
 
     @ViewBuilder

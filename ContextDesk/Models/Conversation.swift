@@ -54,6 +54,7 @@ struct Conversation: Identifiable, Hashable, Codable {
     var customInstructions: String
     var contextText: String
     var contextImages: [AttachedImage]
+    var webAccessEnabled: Bool
     var modelID: String
     var operationID: String
     var formats: Set<OutputFormat>
@@ -69,6 +70,7 @@ struct Conversation: Identifiable, Hashable, Codable {
         customInstructions: String = "",
         contextText: String = "",
         contextImages: [AttachedImage] = [],
+        webAccessEnabled: Bool = false,
         modelID: String,
         operationID: String,
         formats: Set<OutputFormat> = [],
@@ -83,6 +85,7 @@ struct Conversation: Identifiable, Hashable, Codable {
         self.customInstructions = customInstructions
         self.contextText = contextText
         self.contextImages = contextImages
+        self.webAccessEnabled = webAccessEnabled
         self.modelID = modelID
         self.operationID = operationID
         self.formats = formats
@@ -100,6 +103,7 @@ struct Conversation: Identifiable, Hashable, Codable {
         self.customInstructions = try c.decode(String.self, forKey: .customInstructions)
         self.contextText = (try? c.decode(String.self, forKey: .contextText)) ?? ""
         self.contextImages = (try? c.decode([AttachedImage].self, forKey: .contextImages)) ?? []
+        self.webAccessEnabled = (try? c.decode(Bool.self, forKey: .webAccessEnabled)) ?? false
         self.modelID = try c.decode(String.self, forKey: .modelID)
         self.operationID = try c.decode(String.self, forKey: .operationID)
         self.formats = try c.decode(Set<OutputFormat>.self, forKey: .formats)
@@ -110,7 +114,7 @@ struct Conversation: Identifiable, Hashable, Codable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, mode, customInstructions, contextText, contextImages
+        case id, title, mode, customInstructions, contextText, contextImages, webAccessEnabled
         case modelID, operationID, formats, containerFormat, messages
         case createdAt, updatedAt
     }

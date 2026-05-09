@@ -44,6 +44,7 @@ enum AIWritingService {
         contextImages: [AttachedImage] = [],
         operation: Operation,
         model: AIModel,
+        webAccessEnabled: Bool = false,
         apiKey: String
     ) async throws -> [OutputBlock] {
         let prompt = SubmitPrompt(
@@ -53,7 +54,8 @@ enum AIWritingService {
             context: context,
             customInstructions: customInstructions,
             inputImages: inputImages,
-            contextImages: contextImages
+            contextImages: contextImages,
+            webAccessEnabled: webAccessEnabled
         )
 
         let blocks: [OutputBlock]
@@ -83,6 +85,7 @@ extension AIWritingService {
         contextImages: [AttachedImage] = [],
         operation: Operation,
         model: AIModel,
+        webAccessEnabled: Bool = false,
         apiKey: String
     ) -> AsyncThrowingStream<[OutputBlock], Error> {
         AsyncThrowingStream<[OutputBlock], Error> { continuation in
@@ -94,7 +97,8 @@ extension AIWritingService {
                     context: context,
                     customInstructions: customInstructions,
                     inputImages: inputImages,
-                    contextImages: contextImages
+                    contextImages: contextImages,
+                    webAccessEnabled: webAccessEnabled
                 )
 
                 let inner: AsyncThrowingStream<[OutputBlock], Error>
@@ -170,7 +174,7 @@ enum OpenAIService {
         let toolBlocks = webSearchToolBlocks(from: body.output)
         do {
             let structured = try JSONDecoder().decode(StructuredOutput.self, from: Data(trimmed.utf8))
-            return toolBlocks + structured.blocks
+            return toolBlocks + trustedModelOutputBlocks(structured.blocks)
         } catch {
             throw AIWritingServiceError.invalidStructuredOutput(underlying: error)
         }
@@ -263,7 +267,7 @@ extension OpenAIService {
                 var webSearchCallIndex: [String: Int] = [:]
 
                 func yield() {
-                    let combined = toolBlocks + parser.snapshot
+                    let combined = toolBlocks + trustedModelOutputBlocks(parser.snapshot)
                     if combined != lastYielded {
                         continuation.yield(combined)
                         lastYielded = combined
@@ -272,7 +276,7 @@ extension OpenAIService {
 
                 func yieldFinal() -> Bool {
                     do {
-                        let final = toolBlocks + (try parser.finish())
+                        let final = toolBlocks + trustedModelOutputBlocks(try parser.finish())
                         if final != lastYielded {
                             continuation.yield(final)
                             lastYielded = final
@@ -423,7 +427,7 @@ enum AnthropicService {
                 )
             )
         }
-        return toolBlocks + structured.blocks
+        return toolBlocks + trustedModelOutputBlocks(structured.blocks)
     }
 
     /// Walks the response content blocks and produces `.toolCall` /
@@ -541,7 +545,7 @@ extension AnthropicService {
                 var serverCallName: [Int: String] = [:]
 
                 func yield() {
-                    let combined = toolBlocks + parser.snapshot
+                    let combined = toolBlocks + trustedModelOutputBlocks(parser.snapshot)
                     if combined != lastYielded {
                         continuation.yield(combined)
                         lastYielded = combined
@@ -552,7 +556,7 @@ extension AnthropicService {
                     guard !didFinalize else { return }
                     didFinalize = true
                     do {
-                        let final = toolBlocks + (try parser.finish())
+                        let final = toolBlocks + trustedModelOutputBlocks(try parser.finish())
                         if final != lastYielded {
                             continuation.yield(final)
                             lastYielded = final
@@ -706,12 +710,31 @@ private func extractErrorMessage(from payload: [String: Any]) -> String? {
     return nil
 }
 
+private enum WebAccessPolicy {
+    static let enabledInstructions = """
+    Web access is enabled for this request. Use hosted web search or fetch only when the answer needs current facts, source verification, or cited web evidence.
+    Do not include API keys, tokens, passwords, private conversation text, pasted confidential material, personal contact details, or unreduced proprietary data in web search queries or fetched URLs. Summarize the need into a minimal public-safe query instead.
+    """
+}
+
+private func trustedModelOutputBlocks(_ blocks: [OutputBlock]) -> [OutputBlock] {
+    blocks.filter { block in
+        switch block {
+        case .toolCall, .toolResult:
+            return false
+        case .paragraph, .heading, .bulletList, .table, .codeBlock, .unknown:
+            return true
+        }
+    }
+}
+
 struct SubmitPrompt {
     let model: AIModel
     let input: String
     let instructions: String
     let inputImages: [AttachedImage]
     let contextImages: [AttachedImage]
+    let webAccessEnabled: Bool
 
     var hasImages: Bool { !inputImages.isEmpty || !contextImages.isEmpty }
 
@@ -722,12 +745,14 @@ struct SubmitPrompt {
         context: String,
         customInstructions: String,
         inputImages: [AttachedImage] = [],
-        contextImages: [AttachedImage] = []
+        contextImages: [AttachedImage] = [],
+        webAccessEnabled: Bool = false
     ) {
         self.model = model
         self.input = input
         self.inputImages = inputImages
         self.contextImages = contextImages
+        self.webAccessEnabled = webAccessEnabled
 
         var sections: [String] = [
             operation.instructions,
@@ -759,6 +784,10 @@ struct SubmitPrompt {
             sections.append("""
             Input images are attached after the context images and before the input text. Treat them as part of the input the user wants improved — visual content the user is referring to, asking about, or wants you to fold into the rewrite.
             """)
+        }
+
+        if webAccessEnabled {
+            sections.append(WebAccessPolicy.enabledInstructions)
         }
 
         sections.append("""
@@ -808,10 +837,11 @@ struct OpenAISubmitRequest: Encodable {
         } else {
             self.input = .text(prompt.input)
         }
-        self.tools = [
-            .function(.emitOutput()),
-            .hosted(.webSearch),
-        ]
+        var tools: [OpenAITool] = [.function(.emitOutput())]
+        if prompt.webAccessEnabled {
+            tools.append(.hosted(.webSearch))
+        }
+        self.tools = tools
         self.toolChoice = OpenAIToolChoice.function(name: StructuredOutputSchema.toolName)
         self.stream = stream ? true : nil
     }
@@ -1027,7 +1057,7 @@ struct AnthropicSubmitRequest: Encodable {
         } else {
             self.messages = [AnthropicMessage(role: "user", content: .text(prompt.input))]
         }
-        self.tools = [
+        var tools: [AnthropicToolEntry] = [
             .custom(
                 AnthropicTool(
                     name: StructuredOutputSchema.toolName,
@@ -1035,9 +1065,12 @@ struct AnthropicSubmitRequest: Encodable {
                     inputSchema: RawJSON(StructuredOutputSchema.schemaData)
                 )
             ),
-            .server(.webSearch),
-            .server(.webFetch),
         ]
+        if prompt.webAccessEnabled {
+            tools.append(.server(.webSearch))
+            tools.append(.server(.webFetch))
+        }
+        self.tools = tools
         self.toolChoice = thinkingEnabled
             ? .auto
             : .tool(name: StructuredOutputSchema.toolName)
@@ -1392,15 +1425,18 @@ struct ChatSubmitPrompt {
     let model: AIModel
     let system: String
     let turns: [ChatTurn]
+    let webAccessEnabled: Bool
 
     init(
         model: AIModel,
         operation: Operation,
         customInstructions: String,
-        turns: [ChatTurn]
+        turns: [ChatTurn],
+        webAccessEnabled: Bool = false
     ) {
         self.model = model
         self.turns = turns
+        self.webAccessEnabled = webAccessEnabled
 
         var sections: [String] = [operation.instructions]
         let trimmedCustom = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1413,6 +1449,9 @@ struct ChatSubmitPrompt {
         sections.append("""
         You are in a multi-turn chat with the user. Use prior turns as context when answering the latest user message. Stay concise and stay on the user's task.
         """)
+        if webAccessEnabled {
+            sections.append(WebAccessPolicy.enabledInstructions)
+        }
         sections.append("""
         Global output rules (apply to every response, override any conflicting guidance above):
         - Always emit your final answer using the structured output schema. Do not reply with prose only — every response must populate the `blocks` array. (Anthropic providers: call the `\(StructuredOutputSchema.toolName)` tool exactly once.)
@@ -1429,6 +1468,7 @@ extension AIWritingService {
         operation: Operation,
         customInstructions: String = "",
         model: AIModel,
+        webAccessEnabled: Bool = false,
         apiKey: String
     ) -> AsyncThrowingStream<[OutputBlock], Error> {
         AsyncThrowingStream<[OutputBlock], Error> { continuation in
@@ -1437,7 +1477,8 @@ extension AIWritingService {
                     model: model,
                     operation: operation,
                     customInstructions: customInstructions,
-                    turns: turns
+                    turns: turns,
+                    webAccessEnabled: webAccessEnabled
                 )
 
                 let inner: AsyncThrowingStream<[OutputBlock], Error>
@@ -1592,10 +1633,11 @@ struct OpenAIChatRequest: Encodable {
                 content: parts
             )
         }
-        self.tools = [
-            .function(.emitOutput()),
-            .hosted(.webSearch),
-        ]
+        var tools: [OpenAITool] = [.function(.emitOutput())]
+        if prompt.webAccessEnabled {
+            tools.append(.hosted(.webSearch))
+        }
+        self.tools = tools
         self.toolChoice = OpenAIToolChoice.function(name: StructuredOutputSchema.toolName)
         self.stream = stream ? true : nil
     }
@@ -1670,7 +1712,7 @@ struct AnthropicChatRequest: Encodable {
                 content: .blocks(blocks)
             )
         }
-        self.tools = [
+        var tools: [AnthropicToolEntry] = [
             .custom(
                 AnthropicTool(
                     name: StructuredOutputSchema.toolName,
@@ -1678,9 +1720,12 @@ struct AnthropicChatRequest: Encodable {
                     inputSchema: RawJSON(StructuredOutputSchema.schemaData)
                 )
             ),
-            .server(.webSearch),
-            .server(.webFetch),
         ]
+        if prompt.webAccessEnabled {
+            tools.append(.server(.webSearch))
+            tools.append(.server(.webFetch))
+        }
+        self.tools = tools
         self.toolChoice = thinkingEnabled
             ? .auto
             : .tool(name: StructuredOutputSchema.toolName)

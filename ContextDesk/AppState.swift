@@ -49,6 +49,9 @@ final class AppState: ObservableObject {
     @Published var contextImages: [AttachedImage] = [] {
         didSet { syncActiveConversationMeta() }
     }
+    @Published var webAccessEnabled: Bool = false {
+        didSet { syncActiveConversationMeta() }
+    }
     @Published var lastAddedContextImageID: String? = nil
     @Published var editingContext: Bool = false
 
@@ -271,6 +274,7 @@ final class AppState: ObservableObject {
         customInstructions = convo.customInstructions
         contextText = convo.contextText
         contextImages = convo.contextImages
+        webAccessEnabled = convo.webAccessEnabled
         lastAddedContextImageID = nil
         if let m = AIModel.model(withID: convo.modelID) { model = m }
         draft = ""
@@ -295,6 +299,7 @@ final class AppState: ObservableObject {
                 draftImages = []
                 contextText = ""
                 contextImages = []
+                webAccessEnabled = false
             }
         }
     }
@@ -307,6 +312,7 @@ final class AppState: ObservableObject {
         draftImages = []
         contextText = ""
         contextImages = []
+        webAccessEnabled = false
         ConversationStore.save([])
     }
 
@@ -334,6 +340,7 @@ final class AppState: ObservableObject {
         convo.customInstructions = customInstructions
         convo.contextText = contextText
         convo.contextImages = contextImages
+        convo.webAccessEnabled = webAccessEnabled
         convo.modelID = model.id
         conversations[idx] = convo
     }
@@ -417,6 +424,7 @@ final class AppState: ObservableObject {
         let snapshotOperation = activeOperation
         let snapshotInstructions = customInstructions
         let snapshotModel = model
+        let snapshotWebAccessEnabled = webAccessEnabled
 
         running = true
         runTask?.cancel()
@@ -427,6 +435,7 @@ final class AppState: ObservableObject {
                     operation: snapshotOperation,
                     customInstructions: snapshotInstructions,
                     model: snapshotModel,
+                    webAccessEnabled: snapshotWebAccessEnabled,
                     apiKey: apiKey
                 )
                 for try await blocks in stream {

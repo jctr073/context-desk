@@ -20,9 +20,9 @@ final class AnthropicRequestEncodingTests: XCTestCase {
         XCTAssertNil(payload["output_config"])
 
         let tools = try XCTUnwrap(payload["tools"] as? [[String: Any]])
-        XCTAssertEqual(tools.count, 3)
+        XCTAssertEqual(tools.count, 1)
 
-        // First tool: emit_output (custom).
+        // emit_output (custom) is always present.
         let emit = tools[0]
         XCTAssertNil(emit["type"], "custom emit_output tool has no type discriminator")
         XCTAssertEqual(emit["name"] as? String, StructuredOutputSchema.toolName)
@@ -31,21 +31,30 @@ final class AnthropicRequestEncodingTests: XCTestCase {
         let reencoded = try JSONSerialization.data(withJSONObject: schemaObj, options: [.sortedKeys])
         XCTAssertEqual(reencoded, StructuredOutputSchema.schemaData)
 
-        // Second tool: web_search server tool.
+    }
+
+    func testSubmitRequestAddsServerWebToolsOnlyWhenEnabled() throws {
+        let prompt = makePrompt(model: .claudeSonnet46, input: "Hello", webAccessEnabled: true)
+        let payload = try encode(AnthropicSubmitRequest(prompt: prompt, stream: false))
+
+        let tools = try XCTUnwrap(payload["tools"] as? [[String: Any]])
+        XCTAssertEqual(tools.count, 3)
+
+        XCTAssertEqual(tools[0]["name"] as? String, StructuredOutputSchema.toolName)
         XCTAssertEqual(tools[1]["type"] as? String, "web_search_20260209")
         XCTAssertEqual(tools[1]["name"] as? String, "web_search")
         XCTAssertEqual(tools[1]["max_uses"] as? Int, 5)
-
-        // Third tool: web_fetch server tool.
         XCTAssertEqual(tools[2]["type"] as? String, "web_fetch_20260209")
         XCTAssertEqual(tools[2]["name"] as? String, "web_fetch")
         XCTAssertEqual(tools[2]["max_uses"] as? Int, 5)
+
+        let system = try XCTUnwrap(payload["system"] as? String)
+        XCTAssertTrue(system.contains("Do not include API keys"))
     }
 
     func testSubmitRequestForceEmitOutputWhenThinkingOff() throws {
-        // Sonnet 4.6 has no reasoningEffort → thinking is off → tool_choice
-        // pins emit_output by name. Server tools (web_search/web_fetch)
-        // execute autonomously regardless.
+        // Sonnet 4.6 has no reasoningEffort -> thinking is off -> tool_choice
+        // pins emit_output by name.
         let prompt = makePrompt(model: .claudeSonnet46, input: "Hi")
         let payload = try encode(AnthropicSubmitRequest(prompt: prompt, stream: false))
         let toolChoice = try XCTUnwrap(payload["tool_choice"] as? [String: Any])
@@ -103,10 +112,8 @@ final class AnthropicRequestEncodingTests: XCTestCase {
         XCTAssertEqual(messages[2]["role"] as? String, "user")
 
         let tools = try XCTUnwrap(payload["tools"] as? [[String: Any]])
-        XCTAssertEqual(tools.count, 3)
+        XCTAssertEqual(tools.count, 1)
         XCTAssertEqual(tools[0]["name"] as? String, StructuredOutputSchema.toolName)
-        XCTAssertEqual(tools[1]["name"] as? String, "web_search")
-        XCTAssertEqual(tools[2]["name"] as? String, "web_fetch")
 
         let schemaObj = try XCTUnwrap(tools[0]["input_schema"])
         let reencoded = try JSONSerialization.data(withJSONObject: schemaObj, options: [.sortedKeys])
@@ -118,6 +125,26 @@ final class AnthropicRequestEncodingTests: XCTestCase {
         XCTAssertEqual(toolChoice["disable_parallel_tool_use"] as? Bool, true)
     }
 
+    func testChatRequestAddsServerWebToolsOnlyWhenEnabled() throws {
+        let chat = ChatSubmitPrompt(
+            model: .claudeSonnet46,
+            operation: WritingOp.rephrase,
+            customInstructions: "",
+            turns: [ChatTurn(role: .user, text: "latest?")],
+            webAccessEnabled: true
+        )
+        let payload = try encode(AnthropicChatRequest(prompt: chat, stream: true))
+
+        let tools = try XCTUnwrap(payload["tools"] as? [[String: Any]])
+        XCTAssertEqual(tools.count, 3)
+        XCTAssertEqual(tools[0]["name"] as? String, StructuredOutputSchema.toolName)
+        XCTAssertEqual(tools[1]["name"] as? String, "web_search")
+        XCTAssertEqual(tools[2]["name"] as? String, "web_fetch")
+
+        let system = try XCTUnwrap(payload["system"] as? String)
+        XCTAssertTrue(system.contains("minimal public-safe query"))
+    }
+
     // MARK: - Helpers
 
     private func encode<T: Encodable>(_ value: T) throws -> [String: Any] {
@@ -126,13 +153,18 @@ final class AnthropicRequestEncodingTests: XCTestCase {
         return try XCTUnwrap(obj as? [String: Any])
     }
 
-    private func makePrompt(model: AIModel, input: String) -> SubmitPrompt {
+    private func makePrompt(
+        model: AIModel,
+        input: String,
+        webAccessEnabled: Bool = false
+    ) -> SubmitPrompt {
         SubmitPrompt(
             model: model,
             operation: WritingOp.rephrase,
             input: input,
             context: "",
-            customInstructions: ""
+            customInstructions: "",
+            webAccessEnabled: webAccessEnabled
         )
     }
 }

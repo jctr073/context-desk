@@ -1,5 +1,8 @@
 import SwiftUI
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 // MARK: - ToolKind
 
@@ -129,6 +132,29 @@ enum ToolResultParser {
         default:
             return nil
         }
+    }
+}
+
+enum ExternalURLPolicy {
+    private static let allowedSchemes: Set<String> = ["http", "https"]
+
+    static func webURL(from raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              allowedSchemes.contains(scheme),
+              let host = url.host?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !host.isEmpty else {
+            return nil
+        }
+        return url
+    }
+
+    static func openWebURL(from raw: String) {
+#if canImport(AppKit)
+        guard let url = webURL(from: raw) else { return }
+        NSWorkspace.shared.open(url)
+#endif
     }
 }
 
@@ -356,11 +382,7 @@ struct ToolCardView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if let url = URL(string: hit.url) {
-#if canImport(AppKit)
-                NSWorkspace.shared.open(url)
-#endif
-            }
+            ExternalURLPolicy.openWebURL(from: hit.url)
         }
     }
 

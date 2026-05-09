@@ -23,8 +23,6 @@ enum StructuredOutputSchema {
                         Self.bulletListSchema,
                         Self.tableSchema,
                         Self.codeBlockSchema,
-                        Self.toolCallSchema,
-                        Self.toolResultSchema,
                     ]
                 ]
             ]
@@ -104,32 +102,6 @@ enum StructuredOutputSchema {
         ],
     ]
 
-    // Allowed by the schema but never instructed by the system prompt today.
-    // Reserved so a future tool-using build can emit these without another
-    // schema migration.
-    private static let toolCallSchema: [String: Any] = [
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["kind", "id", "name", "arguments"],
-        "properties": [
-            "kind": ["const": "toolCall", "type": "string"],
-            "id": ["type": "string"],
-            "name": ["type": "string"],
-            "arguments": ["type": "string"],
-        ],
-    ]
-
-    private static let toolResultSchema: [String: Any] = [
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["kind", "call_id", "content", "is_error"],
-        "properties": [
-            "kind": ["const": "toolResult", "type": "string"],
-            "call_id": ["type": "string"],
-            "content": ["type": "string"],
-            "is_error": ["type": "boolean"],
-        ],
-    ]
 }
 
 /// Wraps a pre-encoded JSON blob so it can be embedded inside an `Encodable`

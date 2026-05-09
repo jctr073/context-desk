@@ -5,6 +5,10 @@ struct ContentView: View {
 
     var body: some View {
         let palette = Palette.native(for: state.theme)
+        let overlayActive = state.addingKeyFor != nil
+            || state.editingInstructions
+            || state.editingContext
+            || state.lightboxImage != nil
 
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
@@ -25,7 +29,7 @@ struct ContentView: View {
             lightboxOverlay(palette: palette)
         }
         .frame(minWidth: 900, minHeight: 580)
-        .background(WindowAccessor())
+        .background(WindowAccessor(movableByBackground: !overlayActive))
         .onAppear {
             GlobalSelectionShortcut.shared.start {
                 state.importSelectedTextFromActiveApp()
@@ -163,6 +167,8 @@ private struct KeyboardShortcuts: View {
 }
 
 private struct WindowAccessor: NSViewRepresentable {
+    let movableByBackground: Bool
+
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         DispatchQueue.main.async {
@@ -170,9 +176,15 @@ private struct WindowAccessor: NSViewRepresentable {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.styleMask.insert(.fullSizeContentView)
-            window.isMovableByWindowBackground = true
+            window.isMovableByWindowBackground = movableByBackground
         }
         return v
     }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        let target = movableByBackground
+        DispatchQueue.main.async {
+            nsView.window?.isMovableByWindowBackground = target
+        }
+    }
 }

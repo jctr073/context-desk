@@ -376,6 +376,15 @@ private final class ContextEditorTextView: NSTextView {
         super.pasteAsPlainText(sender)
     }
 
+    override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(paste(_:)) {
+            let pb = NSPasteboard.general
+            if pb.canReadObject(forClasses: [NSImage.self], options: nil) { return true }
+            if pb.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) { return true }
+        }
+        return super.validateMenuItem(menuItem)
+    }
+
     private func consumeImages(from pasteboard: NSPasteboard) -> Bool {
         let outcome = AttachedImageLoader.load(from: pasteboard)
         guard !outcome.images.isEmpty else { return false }

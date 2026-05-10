@@ -3,7 +3,7 @@ import Foundation
 enum AIWritingServiceError: LocalizedError {
     case invalidResponse
     case unsupportedProvider(AIProvider)
-    case apiError(String)
+    case apiError(message: String, kind: APIErrorKind)
     case missingOutput
     case invalidStructuredOutput(underlying: Error)
     case emptyBlocks
@@ -14,7 +14,7 @@ enum AIWritingServiceError: LocalizedError {
             return "The AI provider returned an invalid response."
         case .unsupportedProvider(let provider):
             return "\(provider.keyLabel) is not wired up for live requests yet."
-        case .apiError(let message):
+        case .apiError(let message, _):
             return message
         case .missingOutput:
             return "The AI provider did not return any improved text."
@@ -23,6 +23,92 @@ enum AIWritingServiceError: LocalizedError {
         case .emptyBlocks:
             return "The AI provider returned an empty response."
         }
+    }
+}
+
+/// Wraps `URLSession` calls with bounded retry on transient transport-layer
+/// failures (HTTP 429, 5xx). Retries only the *initial* request — once an
+/// SSE stream starts delivering bytes, retrying mid-stream isn't safe and
+/// errors propagate as `apiError` to the caller.
+enum RetryableHTTP {
+    private static let retryStatuses: Set<Int> = [429, 500, 502, 503, 504]
+    private static let maxAttempts = 2
+
+    static func send(request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        var attempt = 0
+        while true {
+            try Task.checkCancellation()
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw AIWritingServiceError.invalidResponse
+            }
+            if shouldRetry(status: http.statusCode), attempt + 1 < maxAttempts {
+                attempt += 1
+                try await Task.sleep(nanoseconds: backoffNanos(attempt: attempt))
+                continue
+            }
+            return (data, http)
+        }
+    }
+
+    static func bytes(request: URLRequest) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
+        var attempt = 0
+        while true {
+            try Task.checkCancellation()
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw AIWritingServiceError.invalidResponse
+            }
+            if shouldRetry(status: http.statusCode), attempt + 1 < maxAttempts {
+                attempt += 1
+                // Drain so the connection cleans up before we retry.
+                for try await _ in bytes {}
+                try await Task.sleep(nanoseconds: backoffNanos(attempt: attempt))
+                continue
+            }
+            return (bytes, http)
+        }
+    }
+
+    private static func shouldRetry(status: Int) -> Bool {
+        retryStatuses.contains(status)
+    }
+
+    private static func backoffNanos(attempt: Int) -> UInt64 {
+        // Jittered exponential: ~800ms then ~2.4s.
+        let baseMs: Double = attempt == 1 ? 800 : 2400
+        let jitter = Double.random(in: 0...0.2) * baseMs
+        return UInt64((baseMs + jitter) * 1_000_000)
+    }
+}
+
+/// Coarse classification of provider-side failures so callers can route the
+/// UI response (reopen the API-key sheet vs. show a retry banner vs. log).
+/// Decoupled from HTTP status so providers' typed error codes flow through.
+enum APIErrorKind: Equatable {
+    case auth
+    case rateLimited
+    case overloaded
+    case server
+    case other
+
+    /// Map a provider HTTP status + optional `error.type` to a kind. The type
+    /// string takes precedence when present because providers sometimes wrap
+    /// rate-limit/auth errors behind a 200 SSE error event.
+    static func classify(httpStatus: Int?, providerErrorType: String?) -> APIErrorKind {
+        if let type = providerErrorType?.lowercased() {
+            if type.contains("auth") || type == "invalid_api_key" || type == "permission_error" { return .auth }
+            if type == "rate_limit_error" || type == "rate_limited" || type.contains("rate_limit") { return .rateLimited }
+            if type == "overloaded_error" { return .overloaded }
+            if type.contains("server_error") || type.contains("internal_server_error") { return .server }
+        }
+        if let status = httpStatus {
+            if status == 401 || status == 403 { return .auth }
+            if status == 429 { return .rateLimited }
+            if status == 529 { return .overloaded }
+            if (500..<600).contains(status) { return .server }
+        }
+        return .other
     }
 }
 
@@ -147,15 +233,15 @@ enum OpenAIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(OpenAISubmitRequest(prompt: prompt))
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AIWritingServiceError.invalidResponse
-        }
+        let (data, httpResponse) = try await RetryableHTTP.send(request: request)
 
         guard (200..<300).contains(httpResponse.statusCode) else {
-            let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data)
-            let message = errorResponse?.error.message ?? "OpenAI request failed with status \(httpResponse.statusCode)."
-            throw AIWritingServiceError.apiError(message)
+            let info = classifyHTTPError(
+                data: data,
+                httpStatus: httpResponse.statusCode,
+                fallbackMessage: "OpenAI request failed with status \(httpResponse.statusCode)."
+            )
+            throw AIWritingServiceError.apiError(message: info.message, kind: info.kind)
         }
 
         return try decodeBlocks(from: data)
@@ -216,18 +302,18 @@ extension OpenAIService {
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     request.httpBody = try JSONEncoder().encode(OpenAISubmitRequest(prompt: prompt, stream: true))
 
-                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw AIWritingServiceError.invalidResponse
-                    }
+                    let (bytes, httpResponse) = try await RetryableHTTP.bytes(request: request)
                     guard (200..<300).contains(httpResponse.statusCode) else {
                         var buffer = Data()
                         for try await byte in bytes {
                             buffer.append(byte)
                         }
-                        let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: buffer)
-                        let message = errorResponse?.error.message ?? "OpenAI request failed with status \(httpResponse.statusCode)."
-                        throw AIWritingServiceError.apiError(message)
+                        let info = classifyHTTPError(
+                            data: buffer,
+                            httpStatus: httpResponse.statusCode,
+                            fallbackMessage: "OpenAI request failed with status \(httpResponse.statusCode)."
+                        )
+                        throw AIWritingServiceError.apiError(message: info.message, kind: info.kind)
                     }
 
                     let events = SSEEventStream.events(from: bytes)
@@ -245,12 +331,21 @@ extension OpenAIService {
         }
     }
 
-    static func decodeStream<S: AsyncSequence>(events: S) -> AsyncThrowingStream<[OutputBlock], Error> where S.Element == SSEEvent {
+    static func decodeStream<S: AsyncSequence>(
+        events: S,
+        onResponseID: (@Sendable (String) -> Void)? = nil
+    ) -> AsyncThrowingStream<[OutputBlock], Error> where S.Element == SSEEvent {
         AsyncThrowingStream<[OutputBlock], Error> { continuation in
             let task = Task {
                 let parser = StreamingOutputParser()
                 var lastYielded: [OutputBlock] = []
                 var eventTypeCounts: [String: Int] = [:]
+                // Capture the Responses API `response.id` exactly once. It
+                // arrives on `response.created` (earliest) and is repeated on
+                // `response.completed`. We pass it back through the optional
+                // callback so AppState can chain the next turn via
+                // `previous_response_id`.
+                var capturedResponseID: String? = nil
                 // Streaming arguments arrive on `response.function_call_arguments.delta`
                 // events keyed by `item_id`. Capture the id of the
                 // emit_output function_call item from `output_item.added`
@@ -303,6 +398,13 @@ extension OpenAIService {
                         eventTypeCounts[type, default: 0] += 1
 
                         switch type {
+                        case "response.created":
+                            if capturedResponseID == nil,
+                               let response = payload["response"] as? [String: Any],
+                               let id = response["id"] as? String {
+                                capturedResponseID = id
+                                onResponseID?(id)
+                            }
                         case "response.output_item.added":
                             guard let item = payload["item"] as? [String: Any] else { continue }
                             let itemType = item["type"] as? String
@@ -343,14 +445,25 @@ extension OpenAIService {
                             parser.feed(delta)
                             yield()
                         case "response.completed":
+                            // Belt-and-braces: pull the id off `response.completed`
+                            // too, so we still report it if `response.created`
+                            // was missed.
+                            if capturedResponseID == nil,
+                               let response = payload["response"] as? [String: Any],
+                               let id = response["id"] as? String {
+                                capturedResponseID = id
+                                onResponseID?(id)
+                            }
                             if yieldFinal() {
                                 continuation.finish()
                             }
                             return
                         case "response.error", "error":
-                            let message = extractErrorMessage(from: payload) ?? "OpenAI streaming error."
+                            let info = extractErrorInfo(from: payload)
+                            let message = info.message ?? "OpenAI streaming error."
+                            let kind = APIErrorKind.classify(httpStatus: nil, providerErrorType: info.type)
                             print("[OpenAI stream] error event: \(message). Payload: \(payload)")
-                            continuation.finish(throwing: AIWritingServiceError.apiError(message))
+                            continuation.finish(throwing: AIWritingServiceError.apiError(message: message, kind: kind))
                             return
                         default:
                             continue
@@ -389,24 +502,35 @@ extension OpenAIService {
 enum AnthropicService {
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     private static let apiVersion = "2023-06-01"
+    /// Beta header for prompt caching. Caching is GA on newer API versions
+    /// without this header; including it here is a safety net for older
+    /// `anthropic-version` values.
+    static let promptCachingBeta = "prompt-caching-2024-07-31"
+
+    /// Apply the headers shared by every Anthropic Messages API request:
+    /// auth, version, content-type, and the prompt-caching beta opt-in.
+    static func applyDefaultHeaders(to request: inout URLRequest, apiKey: String) {
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(promptCachingBeta, forHTTPHeaderField: "anthropic-beta")
+    }
 
     static func submit(prompt: SubmitPrompt, apiKey: String) async throws -> [OutputBlock] {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        applyDefaultHeaders(to: &request, apiKey: apiKey)
         request.httpBody = try JSONEncoder().encode(AnthropicSubmitRequest(prompt: prompt))
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AIWritingServiceError.invalidResponse
-        }
+        let (data, httpResponse) = try await RetryableHTTP.send(request: request)
 
         guard (200..<300).contains(httpResponse.statusCode) else {
-            let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data)
-            let message = errorResponse?.error.message ?? "Anthropic request failed with status \(httpResponse.statusCode)."
-            throw AIWritingServiceError.apiError(message)
+            let info = classifyHTTPError(
+                data: data,
+                httpStatus: httpResponse.statusCode,
+                fallbackMessage: "Anthropic request failed with status \(httpResponse.statusCode)."
+            )
+            throw AIWritingServiceError.apiError(message: info.message, kind: info.kind)
         }
 
         return try decodeBlocks(from: data)
@@ -479,24 +603,22 @@ extension AnthropicService {
                 do {
                     var request = URLRequest(url: endpoint)
                     request.httpMethod = "POST"
-                    request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-                    request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
-                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    applyDefaultHeaders(to: &request, apiKey: apiKey)
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     request.httpBody = try JSONEncoder().encode(AnthropicSubmitRequest(prompt: prompt, stream: true))
 
-                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw AIWritingServiceError.invalidResponse
-                    }
+                    let (bytes, httpResponse) = try await RetryableHTTP.bytes(request: request)
                     guard (200..<300).contains(httpResponse.statusCode) else {
                         var buffer = Data()
                         for try await byte in bytes {
                             buffer.append(byte)
                         }
-                        let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: buffer)
-                        let message = errorResponse?.error.message ?? "Anthropic request failed with status \(httpResponse.statusCode)."
-                        throw AIWritingServiceError.apiError(message)
+                        let info = classifyHTTPError(
+                            data: buffer,
+                            httpStatus: httpResponse.statusCode,
+                            fallbackMessage: "Anthropic request failed with status \(httpResponse.statusCode)."
+                        )
+                        throw AIWritingServiceError.apiError(message: info.message, kind: info.kind)
                     }
 
                     let events = SSEEventStream.events(from: bytes)
@@ -644,9 +766,11 @@ extension AnthropicService {
                             continuation.finish()
                             return
                         case "error":
-                            let message = extractErrorMessage(from: payload) ?? "Anthropic streaming error."
+                            let info = extractErrorInfo(from: payload)
+                            let message = info.message ?? "Anthropic streaming error."
+                            let kind = APIErrorKind.classify(httpStatus: nil, providerErrorType: info.type)
                             print("[Anthropic stream] error event: \(message). Payload: \(payload)")
-                            continuation.finish(throwing: AIWritingServiceError.apiError(message))
+                            continuation.finish(throwing: AIWritingServiceError.apiError(message: message, kind: kind))
                             return
                         default:
                             continue
@@ -700,20 +824,67 @@ private func parseJSONObject(_ data: String) -> [String: Any]? {
     return obj as? [String: Any]
 }
 
-private func extractErrorMessage(from payload: [String: Any]) -> String? {
-    if let err = payload["error"] as? [String: Any], let msg = err["message"] as? String {
-        return msg
+private struct ProviderErrorInfo {
+    let message: String?
+    let type: String?
+}
+
+private func extractErrorInfo(from payload: [String: Any]) -> ProviderErrorInfo {
+    if let err = payload["error"] as? [String: Any] {
+        let msg = err["message"] as? String
+        let type = (err["type"] as? String) ?? (err["code"] as? String)
+        return ProviderErrorInfo(message: msg, type: type)
     }
     if let msg = payload["message"] as? String {
-        return msg
+        return ProviderErrorInfo(message: msg, type: payload["type"] as? String)
     }
-    return nil
+    return ProviderErrorInfo(message: nil, type: nil)
+}
+
+private func extractErrorMessage(from payload: [String: Any]) -> String? {
+    extractErrorInfo(from: payload).message
+}
+
+/// Decode the body of a non-2xx HTTP response into `(message, kind)` for
+/// `AIWritingServiceError.apiError(_:kind:)`. Used by every provider entry
+/// point so HTTP status + provider `error.type` are always combined.
+private func classifyHTTPError(data: Data, httpStatus: Int, fallbackMessage: String) -> (message: String, kind: APIErrorKind) {
+    let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data)
+    let providerType = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
+        .flatMap { extractErrorInfo(from: $0).type }
+    let message = errorResponse?.error.message ?? fallbackMessage
+    let kind = APIErrorKind.classify(httpStatus: httpStatus, providerErrorType: providerType)
+    return (message, kind)
 }
 
 private enum WebAccessPolicy {
     static let enabledInstructions = """
     Web access is enabled for this request. Use hosted web search or fetch only when the answer needs current facts, source verification, or cited web evidence.
     Do not include API keys, tokens, passwords, private conversation text, pasted confidential material, personal contact details, or unreduced proprietary data in web search queries or fetched URLs. Summarize the need into a minimal public-safe query instead.
+    """
+}
+
+/// The global output rules appended to every system prompt. Hoisted so the
+/// chat path and writing-mode path can't drift.
+private enum GlobalOutputRules {
+    static let text = """
+    Global output rules (apply to every response, override any conflicting guidance above):
+    - Always emit your final answer using the structured output schema. Do not reply with prose only — every response must populate the `blocks` array. (Anthropic providers: call the `\(StructuredOutputSchema.toolName)` tool exactly once.)
+    - Never use em dashes (—, U+2014) in the output. This applies to all prose, bullets, headings, table cells, and any other generated text.
+    - Do not substitute en dashes (–) for em dashes either. Rewrite the sentence using a comma, semicolon, colon, parentheses, or two shorter sentences instead.
+    - When a paragraph draws on web sources, attach a `citations` array to that paragraph block listing the relevant tool calls by `tool_call_id` (the `id` of the `web_search`/`web_fetch` call) and 1-indexed `hit_index` within that call's results. Do not also wrap claims in `<cite>` tags — pick one form per response, prefer `citations`.
+    """
+}
+
+/// Build the "Reference context" system-prompt section if the user supplied
+/// any. Used by both writing-mode (`SubmitPrompt`) and chat-mode
+/// (`ChatSubmitPrompt`) so both providers see the same shape.
+private func referenceContextSection(_ context: String) -> String? {
+    let trimmed = context.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    return """
+    Reference context (use as supporting material — do not rewrite it directly). Treat it as examples to emulate, additional details to weave in, or background to draw on so the rewrite is richer, more accurate, and better aligned in tone, voice, and audience:
+    \(trimmed)
     """
 }
 
@@ -758,12 +929,8 @@ struct SubmitPrompt {
             operation.instructions,
         ]
 
-        let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedContext.isEmpty {
-            sections.append("""
-            Reference context (use as supporting material — do not rewrite it directly). Treat it as examples to emulate, additional details to weave in, or background to draw on so the rewrite is richer, more accurate, and better aligned in tone, voice, and audience:
-            \(trimmedContext)
-            """)
+        if let referenceSection = referenceContextSection(context) {
+            sections.append(referenceSection)
         }
 
         let trimmedCustom = customInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -790,12 +957,7 @@ struct SubmitPrompt {
             sections.append(WebAccessPolicy.enabledInstructions)
         }
 
-        sections.append("""
-        Global output rules (apply to every response, override any conflicting guidance above):
-        - Always emit your final answer using the structured output schema. Do not reply with prose only — every response must populate the `blocks` array. (Anthropic providers: call the `\(StructuredOutputSchema.toolName)` tool exactly once.)
-        - Never use em dashes (—, U+2014) in the output. This applies to all prose, bullets, headings, table cells, and any other generated text.
-        - Do not substitute en dashes (–) for em dashes either. Rewrite the sentence using a comma, semicolon, colon, parentheses, or two shorter sentences instead.
-        """)
+        sections.append(GlobalOutputRules.text)
 
         self.instructions = sections.joined(separator: "\n\n")
     }
@@ -1009,7 +1171,7 @@ struct Reasoning: Encodable {
 struct AnthropicSubmitRequest: Encodable {
     let model: String
     let maxTokens: Int
-    let system: String
+    let system: [AnthropicSystemBlock]
     let thinking: AnthropicThinking?
     let outputConfig: AnthropicOutputConfig?
     let messages: [AnthropicMessage]
@@ -1032,7 +1194,10 @@ struct AnthropicSubmitRequest: Encodable {
     init(prompt: SubmitPrompt, stream: Bool = false) {
         self.model = prompt.model.apiModelID
         self.maxTokens = prompt.model.anthropicMaxTokens
-        self.system = prompt.instructions
+        // Single system block, marked as a cache breakpoint so the same
+        // operation/instructions/global-rules text hits cache on every
+        // subsequent send.
+        self.system = [AnthropicSystemBlock(text: prompt.instructions, cacheControl: .ephemeral)]
         let thinkingEnabled = prompt.model.provider == .anthropic && prompt.model.reasoningEffort != nil
         if thinkingEnabled, let effort = prompt.model.reasoningEffort {
             self.thinking = AnthropicThinking(type: "adaptive")
@@ -1057,6 +1222,18 @@ struct AnthropicSubmitRequest: Encodable {
         } else {
             self.messages = [AnthropicMessage(role: "user", content: .text(prompt.input))]
         }
+        self.tools = AnthropicSubmitRequest.buildTools(webAccessEnabled: prompt.webAccessEnabled)
+        self.toolChoice = thinkingEnabled
+            ? .auto
+            : .tool(name: StructuredOutputSchema.toolName)
+        self.stream = stream ? true : nil
+    }
+
+    /// Build the tools array with a `cache_control: ephemeral` marker on the
+    /// last entry. Order: [emit_output, web_search?, web_fetch?]. The last
+    /// element gets the breakpoint regardless of which tool it is, so the
+    /// schema (which dominates the tools-byte cost) is always cached.
+    static func buildTools(webAccessEnabled: Bool) -> [AnthropicToolEntry] {
         var tools: [AnthropicToolEntry] = [
             .custom(
                 AnthropicTool(
@@ -1066,15 +1243,14 @@ struct AnthropicSubmitRequest: Encodable {
                 )
             ),
         ]
-        if prompt.webAccessEnabled {
+        if webAccessEnabled {
             tools.append(.server(.webSearch))
             tools.append(.server(.webFetch))
         }
-        self.tools = tools
-        self.toolChoice = thinkingEnabled
-            ? .auto
-            : .tool(name: StructuredOutputSchema.toolName)
-        self.stream = stream ? true : nil
+        if let last = tools.last {
+            tools[tools.count - 1] = last.withCacheControl(.ephemeral)
+        }
+        return tools
     }
 
     func encode(to encoder: Encoder) throws {
@@ -1099,6 +1275,42 @@ struct AnthropicOutputConfig: Encodable {
     let effort: String
 }
 
+/// `cache_control` marker that turns the enclosing block into a prompt-cache
+/// breakpoint. Anthropic supports up to 4 breakpoints per request; we use
+/// three: end of `system`, end of `tools`, and end of the transcript prefix
+/// (chat mode only).
+struct AnthropicCacheControl: Encodable {
+    let type: String
+    static let ephemeral = AnthropicCacheControl(type: "ephemeral")
+}
+
+/// Typed `system` block. Wire shape: `{type: "text", text: "...", cache_control?: {...}}`.
+/// The Messages API also accepts a plain string for `system`, but the array
+/// form is required to attach `cache_control`.
+struct AnthropicSystemBlock: Encodable {
+    let type: String
+    let text: String
+    let cacheControl: AnthropicCacheControl?
+
+    init(text: String, cacheControl: AnthropicCacheControl? = nil) {
+        self.type = "text"
+        self.text = text
+        self.cacheControl = cacheControl
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type, text
+        case cacheControl = "cache_control"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(type, forKey: .type)
+        try c.encode(text, forKey: .text)
+        try c.encodeIfPresent(cacheControl, forKey: .cacheControl)
+    }
+}
+
 struct AnthropicMessage: Encodable {
     let role: String
     let content: AnthropicMessageContent
@@ -1121,6 +1333,10 @@ enum AnthropicMessageContent: Encodable {
 
 enum AnthropicContentBlock: Encodable {
     case text(String)
+    /// A text block carrying a `cache_control: ephemeral` marker. Used to
+    /// pin the trailing prefix of the transcript so subsequent requests
+    /// can read the prefix from cache.
+    case cachedText(String)
     case image(mediaType: String, data: String)
     /// A model-issued tool call. `input` is the parsed argument object.
     case toolUse(id: String, name: String, input: RawJSON)
@@ -1133,6 +1349,7 @@ enum AnthropicContentBlock: Encodable {
         case toolUseID = "tool_use_id"
         case content
         case isError = "is_error"
+        case cacheControl = "cache_control"
     }
 
     private enum SourceKeys: String, CodingKey {
@@ -1147,6 +1364,10 @@ enum AnthropicContentBlock: Encodable {
         case .text(let value):
             try c.encode("text", forKey: .type)
             try c.encode(value, forKey: .text)
+        case .cachedText(let value):
+            try c.encode("text", forKey: .type)
+            try c.encode(value, forKey: .text)
+            try c.encode(AnthropicCacheControl.ephemeral, forKey: .cacheControl)
         case .image(let mediaType, let data):
             try c.encode("image", forKey: .type)
             var source = c.nestedContainer(keyedBy: SourceKeys.self, forKey: .source)
@@ -1189,10 +1410,31 @@ struct AnthropicTool: Encodable {
     let name: String
     let description: String
     let inputSchema: RawJSON
+    let cacheControl: AnthropicCacheControl?
+
+    init(name: String, description: String, inputSchema: RawJSON, cacheControl: AnthropicCacheControl? = nil) {
+        self.name = name
+        self.description = description
+        self.inputSchema = inputSchema
+        self.cacheControl = cacheControl
+    }
 
     private enum CodingKeys: String, CodingKey {
         case name, description
         case inputSchema = "input_schema"
+        case cacheControl = "cache_control"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(name, forKey: .name)
+        try c.encode(description, forKey: .description)
+        try c.encode(inputSchema, forKey: .inputSchema)
+        try c.encodeIfPresent(cacheControl, forKey: .cacheControl)
+    }
+
+    func withCacheControl(_ cacheControl: AnthropicCacheControl) -> AnthropicTool {
+        AnthropicTool(name: name, description: description, inputSchema: inputSchema, cacheControl: cacheControl)
     }
 }
 
@@ -1204,10 +1446,19 @@ struct AnthropicServerTool: Encodable {
     let type: String
     let name: String
     let maxUses: Int?
+    let cacheControl: AnthropicCacheControl?
+
+    init(type: String, name: String, maxUses: Int?, cacheControl: AnthropicCacheControl? = nil) {
+        self.type = type
+        self.name = name
+        self.maxUses = maxUses
+        self.cacheControl = cacheControl
+    }
 
     private enum CodingKeys: String, CodingKey {
         case type, name
         case maxUses = "max_uses"
+        case cacheControl = "cache_control"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -1215,6 +1466,11 @@ struct AnthropicServerTool: Encodable {
         try c.encode(type, forKey: .type)
         try c.encode(name, forKey: .name)
         try c.encodeIfPresent(maxUses, forKey: .maxUses)
+        try c.encodeIfPresent(cacheControl, forKey: .cacheControl)
+    }
+
+    func withCacheControl(_ cacheControl: AnthropicCacheControl) -> AnthropicServerTool {
+        AnthropicServerTool(type: type, name: name, maxUses: maxUses, cacheControl: cacheControl)
     }
 
     static let webSearch = AnthropicServerTool(
@@ -1227,6 +1483,15 @@ struct AnthropicServerTool: Encodable {
         name: "web_fetch",
         maxUses: 5
     )
+}
+
+extension AnthropicToolEntry {
+    func withCacheControl(_ cacheControl: AnthropicCacheControl) -> AnthropicToolEntry {
+        switch self {
+        case .custom(let t): return .custom(t.withCacheControl(cacheControl))
+        case .server(let s): return .server(s.withCacheControl(cacheControl))
+        }
+    }
 }
 
 enum AnthropicToolChoice: Encodable {
@@ -1420,11 +1685,15 @@ struct ChatTurn {
 }
 
 /// System prompt + transcript bundle for a chat-style submit. Mirrors the
-/// shape of `SubmitPrompt` but carries an arbitrary number of turns.
+/// shape of `SubmitPrompt` but carries an arbitrary number of turns plus
+/// conversation-wide reference context (text in `system`, images as a
+/// stable preamble user message — see `OpenAIChatRequest` /
+/// `AnthropicChatRequest`).
 struct ChatSubmitPrompt {
     let model: AIModel
     let system: String
     let turns: [ChatTurn]
+    let contextImages: [AttachedImage]
     let webAccessEnabled: Bool
 
     init(
@@ -1432,10 +1701,13 @@ struct ChatSubmitPrompt {
         operation: Operation,
         customInstructions: String,
         turns: [ChatTurn],
+        context: String = "",
+        contextImages: [AttachedImage] = [],
         webAccessEnabled: Bool = false
     ) {
         self.model = model
         self.turns = turns
+        self.contextImages = contextImages
         self.webAccessEnabled = webAccessEnabled
 
         var sections: [String] = [operation.instructions]
@@ -1446,18 +1718,21 @@ struct ChatSubmitPrompt {
             \(trimmedCustom)
             """)
         }
+        if let referenceSection = referenceContextSection(context) {
+            sections.append(referenceSection)
+        }
+        if !contextImages.isEmpty {
+            sections.append("""
+            Reference context images are attached as a stable preamble user message at the start of the conversation, before the first real user turn. Treat them the same way as text context: as supporting material to draw on for tone, audience, or detail — do not transcribe or describe them unless that's plainly what the user wants.
+            """)
+        }
         sections.append("""
         You are in a multi-turn chat with the user. Use prior turns as context when answering the latest user message. Stay concise and stay on the user's task.
         """)
         if webAccessEnabled {
             sections.append(WebAccessPolicy.enabledInstructions)
         }
-        sections.append("""
-        Global output rules (apply to every response, override any conflicting guidance above):
-        - Always emit your final answer using the structured output schema. Do not reply with prose only — every response must populate the `blocks` array. (Anthropic providers: call the `\(StructuredOutputSchema.toolName)` tool exactly once.)
-        - Never use em dashes (—, U+2014) in the output. This applies to all prose, bullets, headings, table cells, and any other generated text.
-        - Do not substitute en dashes (–) for em dashes either. Rewrite the sentence using a comma, semicolon, colon, parentheses, or two shorter sentences instead.
-        """)
+        sections.append(GlobalOutputRules.text)
         self.system = sections.joined(separator: "\n\n")
     }
 }
@@ -1467,9 +1742,13 @@ extension AIWritingService {
         turns: [ChatTurn],
         operation: Operation,
         customInstructions: String = "",
+        context: String = "",
+        contextImages: [AttachedImage] = [],
+        previousResponseID: String? = nil,
         model: AIModel,
         webAccessEnabled: Bool = false,
-        apiKey: String
+        apiKey: String,
+        onResponseID: (@Sendable (String) -> Void)? = nil
     ) -> AsyncThrowingStream<[OutputBlock], Error> {
         AsyncThrowingStream<[OutputBlock], Error> { continuation in
             let task = Task {
@@ -1478,13 +1757,20 @@ extension AIWritingService {
                     operation: operation,
                     customInstructions: customInstructions,
                     turns: turns,
+                    context: context,
+                    contextImages: contextImages,
                     webAccessEnabled: webAccessEnabled
                 )
 
                 let inner: AsyncThrowingStream<[OutputBlock], Error>
                 switch model.provider {
                 case .openai:
-                    inner = OpenAIService.submitChatStream(prompt: prompt, apiKey: apiKey)
+                    inner = OpenAIService.submitChatStream(
+                        prompt: prompt,
+                        apiKey: apiKey,
+                        previousResponseID: previousResponseID,
+                        onResponseID: onResponseID
+                    )
                 case .anthropic:
                     inner = AnthropicService.submitChatStream(prompt: prompt, apiKey: apiKey)
                 case .google:
@@ -1513,7 +1799,12 @@ extension AIWritingService {
 }
 
 extension OpenAIService {
-    static func submitChatStream(prompt: ChatSubmitPrompt, apiKey: String) -> AsyncThrowingStream<[OutputBlock], Error> {
+    static func submitChatStream(
+        prompt: ChatSubmitPrompt,
+        apiKey: String,
+        previousResponseID: String? = nil,
+        onResponseID: (@Sendable (String) -> Void)? = nil
+    ) -> AsyncThrowingStream<[OutputBlock], Error> {
         AsyncThrowingStream<[OutputBlock], Error> { continuation in
             let task = Task {
                 do {
@@ -1522,22 +1813,26 @@ extension OpenAIService {
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    request.httpBody = try JSONEncoder().encode(OpenAIChatRequest(prompt: prompt, stream: true))
+                    request.httpBody = try JSONEncoder().encode(OpenAIChatRequest(
+                        prompt: prompt,
+                        stream: true,
+                        previousResponseID: previousResponseID
+                    ))
 
-                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw AIWritingServiceError.invalidResponse
-                    }
+                    let (bytes, httpResponse) = try await RetryableHTTP.bytes(request: request)
                     guard (200..<300).contains(httpResponse.statusCode) else {
                         var buffer = Data()
                         for try await byte in bytes { buffer.append(byte) }
-                        let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: buffer)
-                        let message = errorResponse?.error.message ?? "OpenAI request failed with status \(httpResponse.statusCode)."
-                        throw AIWritingServiceError.apiError(message)
+                        let info = classifyHTTPError(
+                            data: buffer,
+                            httpStatus: httpResponse.statusCode,
+                            fallbackMessage: "OpenAI request failed with status \(httpResponse.statusCode)."
+                        )
+                        throw AIWritingServiceError.apiError(message: info.message, kind: info.kind)
                     }
 
                     let events = SSEEventStream.events(from: bytes)
-                    for try await snapshot in decodeStream(events: events) {
+                    for try await snapshot in decodeStream(events: events, onResponseID: onResponseID) {
                         continuation.yield(snapshot)
                     }
                     continuation.finish()
@@ -1555,24 +1850,22 @@ extension AnthropicService {
         AsyncThrowingStream<[OutputBlock], Error> { continuation in
             let task = Task {
                 do {
-                    var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+                    var request = URLRequest(url: endpoint)
                     request.httpMethod = "POST"
-                    request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-                    request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    applyDefaultHeaders(to: &request, apiKey: apiKey)
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     request.httpBody = try JSONEncoder().encode(AnthropicChatRequest(prompt: prompt, stream: true))
 
-                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw AIWritingServiceError.invalidResponse
-                    }
+                    let (bytes, httpResponse) = try await RetryableHTTP.bytes(request: request)
                     guard (200..<300).contains(httpResponse.statusCode) else {
                         var buffer = Data()
                         for try await byte in bytes { buffer.append(byte) }
-                        let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: buffer)
-                        let message = errorResponse?.error.message ?? "Anthropic request failed with status \(httpResponse.statusCode)."
-                        throw AIWritingServiceError.apiError(message)
+                        let info = classifyHTTPError(
+                            data: buffer,
+                            httpStatus: httpResponse.statusCode,
+                            fallbackMessage: "Anthropic request failed with status \(httpResponse.statusCode)."
+                        )
+                        throw AIWritingServiceError.apiError(message: info.message, kind: info.kind)
                     }
 
                     let events = SSEEventStream.events(from: bytes)
@@ -1599,17 +1892,51 @@ struct OpenAIChatRequest: Encodable {
     let tools: [OpenAITool]
     let toolChoice: OpenAIToolChoice
     let stream: Bool?
+    /// When set, the Responses API treats this request as a continuation of
+    /// the named prior response. We omit the full transcript and send only
+    /// the latest user turn(s) — the server already has everything earlier.
+    let previousResponseID: String?
 
     private enum CodingKeys: String, CodingKey {
         case model, reasoning, instructions, input, tools, stream
         case toolChoice = "tool_choice"
+        case previousResponseID = "previous_response_id"
     }
 
-    init(prompt: ChatSubmitPrompt, stream: Bool = false) {
+    init(prompt: ChatSubmitPrompt, stream: Bool = false, previousResponseID: String? = nil) {
         self.model = prompt.model.apiModelID
         self.reasoning = prompt.model.reasoningEffort.map { Reasoning(effort: $0.rawValue) }
         self.instructions = prompt.system
-        self.input = prompt.turns.compactMap { turn in
+        self.previousResponseID = previousResponseID
+        var input: [OpenAIInputItem] = []
+        // When chaining via previous_response_id, the server already has the
+        // preamble + earlier turns; send only the trailing user turn.
+        let turnsToSend: [ChatTurn]
+        let includePreamble: Bool
+        if previousResponseID != nil {
+            // Send only the latest user turn (the new one being asked).
+            if let lastUserIdx = prompt.turns.lastIndex(where: { $0.role == .user }) {
+                turnsToSend = [prompt.turns[lastUserIdx]]
+            } else {
+                turnsToSend = []
+            }
+            includePreamble = false
+        } else {
+            turnsToSend = prompt.turns
+            includePreamble = true
+        }
+        // Stable preamble: conversation-wide context images come first, in
+        // their own user item, immutable across turns. Keeping them separate
+        // (rather than splicing into the first real user turn) preserves the
+        // transcript prefix for prompt caching.
+        if includePreamble && !prompt.contextImages.isEmpty {
+            var parts: [OpenAIInputContent] = []
+            for img in prompt.contextImages {
+                parts.append(.image(url: img.dataURL))
+            }
+            input.append(OpenAIInputItem(role: "user", content: parts))
+        }
+        for turn in turnsToSend {
             var parts: [OpenAIInputContent] = []
             // Image inputs are only valid on user turns in the Responses API.
             if turn.role == .user {
@@ -1626,13 +1953,14 @@ struct OpenAIChatRequest: Encodable {
                     parts.append(.text(turn.text))
                 }
             } else if turn.role == .assistant {
-                return nil
+                continue
             }
-            return OpenAIInputItem(
+            input.append(OpenAIInputItem(
                 role: turn.role == .user ? "user" : "assistant",
                 content: parts
-            )
+            ))
         }
+        self.input = input
         var tools: [OpenAITool] = [.function(.emitOutput())]
         if prompt.webAccessEnabled {
             tools.append(.hosted(.webSearch))
@@ -1651,13 +1979,14 @@ struct OpenAIChatRequest: Encodable {
         try c.encode(tools, forKey: .tools)
         try c.encode(toolChoice, forKey: .toolChoice)
         try c.encodeIfPresent(stream, forKey: .stream)
+        try c.encodeIfPresent(previousResponseID, forKey: .previousResponseID)
     }
 }
 
 struct AnthropicChatRequest: Encodable {
     let model: String
     let maxTokens: Int
-    let system: String
+    let system: [AnthropicSystemBlock]
     let thinking: AnthropicThinking?
     let outputConfig: AnthropicOutputConfig?
     let messages: [AnthropicMessage]
@@ -1680,7 +2009,8 @@ struct AnthropicChatRequest: Encodable {
     init(prompt: ChatSubmitPrompt, stream: Bool = false) {
         self.model = prompt.model.apiModelID
         self.maxTokens = prompt.model.anthropicChatMaxTokens
-        self.system = prompt.system
+        // Single system block, cache-breakpointed.
+        self.system = [AnthropicSystemBlock(text: prompt.system, cacheControl: .ephemeral)]
         let thinkingEnabled = prompt.model.provider == .anthropic && prompt.model.reasoningEffort != nil
         if thinkingEnabled, let effort = prompt.model.reasoningEffort {
             self.thinking = AnthropicThinking(type: "adaptive")
@@ -1689,14 +2019,26 @@ struct AnthropicChatRequest: Encodable {
             self.thinking = nil
             self.outputConfig = nil
         }
-        self.messages = prompt.turns.compactMap { turn in
+        var messages: [AnthropicMessage] = []
+        // Stable preamble: conversation-wide context images live in their
+        // own user message before the first real turn. Keeping them
+        // immutable across turns preserves the cacheable prefix.
+        if !prompt.contextImages.isEmpty {
+            var preamble: [AnthropicContentBlock] = []
+            for img in prompt.contextImages {
+                preamble.append(.image(mediaType: img.mimeType, data: img.base64))
+            }
+            messages.append(AnthropicMessage(role: "user", content: .blocks(preamble)))
+        }
+        for turn in prompt.turns {
             let trimmed = turn.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if turn.images.isEmpty {
-                guard !trimmed.isEmpty else { return nil }
-                return AnthropicMessage(
+                guard !trimmed.isEmpty else { continue }
+                messages.append(AnthropicMessage(
                     role: turn.role == .user ? "user" : "assistant",
                     content: .text(turn.text)
-                )
+                ))
+                continue
             }
             var blocks: [AnthropicContentBlock] = []
             for img in turn.images {
@@ -1705,31 +2047,55 @@ struct AnthropicChatRequest: Encodable {
             if !trimmed.isEmpty {
                 blocks.append(.text(turn.text))
             } else if turn.role == .assistant {
-                return nil
+                continue
             }
-            return AnthropicMessage(
+            messages.append(AnthropicMessage(
                 role: turn.role == .user ? "user" : "assistant",
                 content: .blocks(blocks)
-            )
+            ))
         }
-        var tools: [AnthropicToolEntry] = [
-            .custom(
-                AnthropicTool(
-                    name: StructuredOutputSchema.toolName,
-                    description: StructuredOutputSchema.description,
-                    inputSchema: RawJSON(StructuredOutputSchema.schemaData)
-                )
-            ),
-        ]
-        if prompt.webAccessEnabled {
-            tools.append(.server(.webSearch))
-            tools.append(.server(.webFetch))
-        }
-        self.tools = tools
+        // Mark the trailing transcript prefix as a cache breakpoint. We
+        // attach `cache_control` to the final content block of the last
+        // *assistant* message so the next turn (which adds a new user
+        // message after this) reads the prior transcript from cache. If
+        // there's no assistant message yet (first user turn), the system
+        // and tools breakpoints alone do the work.
+        self.messages = AnthropicChatRequest.markTranscriptBreakpoint(messages)
+        self.tools = AnthropicSubmitRequest.buildTools(webAccessEnabled: prompt.webAccessEnabled)
         self.toolChoice = thinkingEnabled
             ? .auto
             : .tool(name: StructuredOutputSchema.toolName)
         self.stream = stream ? true : nil
+    }
+
+    /// Find the last assistant message and replace its content with a block
+    /// form whose final text block carries `cache_control: ephemeral`. If
+    /// the content is currently a plain string, it's converted to blocks.
+    /// Pure transformation; messages without an assistant turn return as-is.
+    static func markTranscriptBreakpoint(_ messages: [AnthropicMessage]) -> [AnthropicMessage] {
+        guard let lastAssistantIdx = messages.lastIndex(where: { $0.role == "assistant" }) else {
+            return messages
+        }
+        var out = messages
+        let original = out[lastAssistantIdx]
+        let updatedContent: AnthropicMessageContent
+        switch original.content {
+        case .text(let value):
+            updatedContent = .blocks([.cachedText(value)])
+        case .blocks(var blocks):
+            if let lastIdx = blocks.indices.last {
+                if case .text(let value) = blocks[lastIdx] {
+                    blocks[lastIdx] = .cachedText(value)
+                } else {
+                    blocks.append(.cachedText(""))
+                }
+            } else {
+                blocks.append(.cachedText(""))
+            }
+            updatedContent = .blocks(blocks)
+        }
+        out[lastAssistantIdx] = AnthropicMessage(role: original.role, content: updatedContent)
+        return out
     }
 
     func encode(to encoder: Encoder) throws {

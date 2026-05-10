@@ -115,6 +115,34 @@ final class OutputBlockCodingTests: XCTestCase {
         XCTAssertEqual(kind, "futureWidget")
     }
 
+    func testParagraphWithCitationsRoundTrip() throws {
+        let block: OutputBlock = .paragraph(
+            text: "Per the docs, X is true.",
+            citations: [
+                Citation(toolCallID: "ws_1", hitIndex: 1),
+                Citation(toolCallID: "ws_1", hitIndex: 3),
+            ]
+        )
+        try assertRoundTrip(block)
+    }
+
+    func testDecodesParagraphWithStructuredCitations() throws {
+        let json = #"{"kind":"paragraph","text":"hi","citations":[{"hit_index":2,"tool_call_id":"ws_abc"}]}"#
+        let block = try decoder.decode(OutputBlock.self, from: Data(json.utf8))
+        XCTAssertEqual(block, .paragraph(
+            text: "hi",
+            citations: [Citation(toolCallID: "ws_abc", hitIndex: 2)]
+        ))
+    }
+
+    func testDecodesParagraphWithNullCitationsAsBare() throws {
+        // OpenAI strict mode emits citations: null when there are none. We
+        // decode that as the bare paragraph (citations: nil).
+        let json = #"{"citations":null,"kind":"paragraph","text":"hi"}"#
+        let block = try decoder.decode(OutputBlock.self, from: Data(json.utf8))
+        XCTAssertEqual(block, .paragraph(text: "hi"))
+    }
+
     func testStructuredOutputWrapperRoundTrip() throws {
         let blocks: [OutputBlock] = [
             .heading(text: "Title"),

@@ -52,8 +52,8 @@ struct OutputBody: View {
     @ViewBuilder
     private func renderBlock(_ block: OutputBlock, registry: CitationRegistry) -> some View {
         switch block {
-        case .paragraph(let text):
-            proseText(text, registry: registry)
+        case .paragraph(let text, let citations):
+            proseText(text, registry: registry, structuredCitations: citations)
                 .font(.system(size: 14))
                 .lineSpacing(14 * 0.55) // approximates line-height 1.55
                 .foregroundColor(palette.text)
@@ -116,12 +116,17 @@ struct OutputBody: View {
         }
     }
 
-    private func proseText(_ s: String, registry: CitationRegistry) -> Text {
+    private func proseText(
+        _ s: String,
+        registry: CitationRegistry,
+        structuredCitations: [Citation]? = nil
+    ) -> Text {
         ProseTextBuilder.text(
             s,
             registry: registry,
             palette: palette,
-            slack: containerFormat == .slack
+            slack: containerFormat == .slack,
+            structuredCitations: structuredCitations
         )
     }
 }

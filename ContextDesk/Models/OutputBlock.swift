@@ -1,7 +1,26 @@
 import Foundation
 
+/// A first-class citation reference attached to a paragraph block. Maps the
+/// paragraph back to a specific tool call (e.g. a `web_search` invocation)
+/// and the index of the result hit within that call's output. Carries the
+/// minimum metadata the UI needs to render a citation pill without parsing
+/// `<cite>` tags out of the prose.
+struct Citation: Hashable, Codable {
+    let toolCallID: String
+    let hitIndex: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case toolCallID = "tool_call_id"
+        case hitIndex = "hit_index"
+    }
+}
+
 enum OutputBlock: Identifiable, Hashable, Codable {
-    case paragraph(text: String)
+    /// Prose paragraph. `citations` is nil when no citations were attached
+    /// (the common case) and an array of structured refs when the model
+    /// emitted them via the schema's `citations` field. The renderer falls
+    /// back to `<cite>` tags inside `text` when this is nil.
+    case paragraph(text: String, citations: [Citation]?)
     case heading(text: String)
     case bulletList(items: [String])
     case table(head: [String], rows: [[String]])
@@ -19,7 +38,7 @@ enum OutputBlock: Identifiable, Hashable, Codable {
 
     var id: String {
         switch self {
-        case .paragraph(let t):    return "p:\(t.hashValue)"
+        case .paragraph(let t, let cites): return "p:\(t.hashValue):\(cites?.hashValue ?? 0)"
         case .heading(let t):      return "h:\(t.hashValue)"
         case .bulletList(let it):  return "ul:\(it.hashValue)"
         case .table(let h, let r): return "tbl:\(h.hashValue):\(r.hashValue)"
@@ -28,6 +47,15 @@ enum OutputBlock: Identifiable, Hashable, Codable {
         case .toolResult(let callID, _, _): return "tr:\(callID)"
         case .unknown(let kind, let raw): return "unk:\(kind):\(raw.hashValue)"
         }
+    }
+}
+
+extension OutputBlock {
+    /// Back-compat factory so existing call sites can still write
+    /// `.paragraph(text: x)` without spelling out `citations: nil`. Disambiguated
+    /// by arity at the call site — the case constructor takes both args.
+    static func paragraph(text: String) -> OutputBlock {
+        .paragraph(text: text, citations: nil)
     }
 }
 
@@ -49,6 +77,7 @@ private enum OutputBlockCodingKeys: String, CodingKey {
     case rows
     case language
     case code
+    case citations
     // toolCall
     case toolCallID = "id"
     case name
@@ -74,7 +103,10 @@ extension OutputBlock {
 
         switch kind {
         case .paragraph:
-            self = .paragraph(text: try container.decode(String.self, forKey: .text))
+            self = .paragraph(
+                text: try container.decode(String.self, forKey: .text),
+                citations: try container.decodeIfPresent([Citation].self, forKey: .citations)
+            )
         case .heading:
             self = .heading(text: try container.decode(String.self, forKey: .text))
         case .bulletList:
@@ -106,10 +138,11 @@ extension OutputBlock {
 
     func encode(to encoder: Encoder) throws {
         switch self {
-        case .paragraph(let text):
+        case .paragraph(let text, let citations):
             var c = encoder.container(keyedBy: OutputBlockCodingKeys.self)
             try c.encode(OutputBlockKind.paragraph.rawValue, forKey: .kind)
             try c.encode(text, forKey: .text)
+            try c.encodeIfPresent(citations, forKey: .citations)
         case .heading(let text):
             var c = encoder.container(keyedBy: OutputBlockCodingKeys.self)
             try c.encode(OutputBlockKind.heading.rawValue, forKey: .kind)

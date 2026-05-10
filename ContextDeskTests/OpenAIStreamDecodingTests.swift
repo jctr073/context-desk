@@ -57,7 +57,7 @@ final class OpenAIStreamDecodingTests: XCTestCase {
     }
 
     func testErrorEventThrowsApiError() async throws {
-        let errorPayload = #"{"type":"response.error","error":{"message":"rate limit hit"}}"#
+        let errorPayload = #"{"type":"response.error","error":{"message":"rate limit hit","type":"rate_limit_error"}}"#
         let events = [
             outputItemAddedEvent(itemID: emitItemID),
             argumentsDeltaEvent(#"{"blocks":[{"kind":"paragraph","text":"part"#, itemID: emitItemID),
@@ -67,11 +67,41 @@ final class OpenAIStreamDecodingTests: XCTestCase {
         do {
             _ = try await collect(events)
             XCTFail("expected stream to throw")
-        } catch let AIWritingServiceError.apiError(message) {
+        } catch let AIWritingServiceError.apiError(message, kind) {
             XCTAssertEqual(message, "rate limit hit")
+            XCTAssertEqual(kind, .rateLimited)
         } catch {
             XCTFail("expected .apiError, got \(error)")
         }
+    }
+
+    func testCapturesResponseIDFromCreatedEvent() async throws {
+        let json = #"{"blocks":[{"kind":"paragraph","text":"hi"}]}"#
+        let events: [SSEEvent] = [
+            SSEEvent(event: nil, data: #"{"type":"response.created","response":{"id":"resp_abc123"}}"#),
+            outputItemAddedEvent(itemID: emitItemID),
+            argumentsDeltaEvent(json, itemID: emitItemID),
+            completedEvent(),
+        ]
+        var captured: [String] = []
+        let seq = EventSequence(events: events)
+        for try await _ in OpenAIService.decodeStream(events: seq, onResponseID: { id in captured.append(id) }) {}
+        XCTAssertEqual(captured, ["resp_abc123"], "response.id must be captured exactly once")
+    }
+
+    func testCapturesResponseIDFromCompletedEventWhenCreatedAbsent() async throws {
+        // If `response.created` was missed, `response.completed` payload
+        // also carries the id; we still surface it.
+        let json = #"{"blocks":[{"kind":"paragraph","text":"hi"}]}"#
+        let events: [SSEEvent] = [
+            outputItemAddedEvent(itemID: emitItemID),
+            argumentsDeltaEvent(json, itemID: emitItemID),
+            SSEEvent(event: nil, data: #"{"type":"response.completed","response":{"id":"resp_xyz"}}"#),
+        ]
+        var captured: [String] = []
+        let seq = EventSequence(events: events)
+        for try await _ in OpenAIService.decodeStream(events: seq, onResponseID: { id in captured.append(id) }) {}
+        XCTAssertEqual(captured, ["resp_xyz"])
     }
 
     func testUnknownEventTypesAreIgnored() async throws {

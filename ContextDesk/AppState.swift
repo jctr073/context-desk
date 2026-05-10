@@ -188,9 +188,25 @@ final class AppState: ObservableObject {
     func startEditingContext() { editingContext = true }
     func cancelEditingContext() { editingContext = false }
     func saveContext(text: String, images: [AttachedImage]) {
+        // If the user changes contextImages mid-conversation, the stable
+        // image preamble that earlier OpenAI responses cached on their side
+        // is no longer correct. Drop the chain so the next send falls back
+        // to the full transcript with the new images.
+        let imagesChanged = images != contextImages
         contextText = text
         contextImages = images
+        if imagesChanged { invalidateProviderResponseChain() }
         editingContext = false
+    }
+
+    /// Clear `providerResponseID` from every message in the active
+    /// conversation. Forces the next OpenAI send to use the full-transcript
+    /// path instead of `previous_response_id`.
+    private func invalidateProviderResponseChain() {
+        guard let convoIdx = conversations.firstIndex(where: { $0.id == activeConversationID }) else { return }
+        for idx in conversations[convoIdx].messages.indices {
+            conversations[convoIdx].messages[idx].providerResponseID = nil
+        }
     }
 
     private func triggerPasteFlash() {
@@ -390,41 +406,50 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func startLiveStream(apiKey: String, assistantIdx: Int) {
+    private func startLiveStream(apiKey: String, assistantIdx: Int, useResponseChain: Bool = true) {
         guard let convoIdx = conversations.firstIndex(where: { $0.id == activeConversationID }) else { return }
         let snapshotConvo = conversations[convoIdx]
-        var turns: [ChatTurn] = snapshotConvo.messages.prefix(assistantIdx).map { msg in
+        let turns: [ChatTurn] = snapshotConvo.messages.prefix(assistantIdx).map { msg in
             ChatTurn(role: msg.role, text: msg.text, images: msg.attachments)
-        }
-        let trimmedContext = contextText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedContext.isEmpty || !contextImages.isEmpty,
-           let firstUser = turns.firstIndex(where: { $0.role == .user }) {
-            let original = turns[firstUser]
-            let preface = trimmedContext.isEmpty
-                ? ""
-                : "Reference material to keep in mind for this conversation:\n\n\(trimmedContext)\n\n---\n\n"
-            turns[firstUser] = ChatTurn(
-                role: .user,
-                text: preface + original.text,
-                images: contextImages + original.images
-            )
         }
         let snapshotOperation = activeOperation
         let snapshotInstructions = customInstructions
+        let snapshotContext = contextText
+        let snapshotContextImages = contextImages
         let snapshotModel = model
         let snapshotWebAccessEnabled = webAccessEnabled
 
+        // Walk back to find the most recent assistant message before
+        // assistantIdx and pull its captured providerResponseID. If present
+        // and the active provider is OpenAI, chain via previous_response_id
+        // so we send only the new user turn. Regenerate disables the chain
+        // (`useResponseChain == false`).
+        let previousResponseID: String? = {
+            guard useResponseChain, snapshotModel.provider == .openai else { return nil }
+            let prior = snapshotConvo.messages.prefix(assistantIdx)
+            return prior.last(where: { $0.role == .assistant })?.providerResponseID
+        }()
+
         running = true
         runTask?.cancel()
+        let conversationID = activeConversationID
         runTask = Task { [weak self] in
             do {
                 let stream = AIWritingService.submitChatStream(
                     turns: turns,
                     operation: snapshotOperation,
                     customInstructions: snapshotInstructions,
+                    context: snapshotContext,
+                    contextImages: snapshotContextImages,
+                    previousResponseID: previousResponseID,
                     model: snapshotModel,
                     webAccessEnabled: snapshotWebAccessEnabled,
-                    apiKey: apiKey
+                    apiKey: apiKey,
+                    onResponseID: { id in
+                        Task { @MainActor [weak self] in
+                            self?.recordResponseID(id, conversationID: conversationID, assistantIdx: assistantIdx)
+                        }
+                    }
                 )
                 for try await blocks in stream {
                     if Task.isCancelled { return }
@@ -444,6 +469,13 @@ final class AppState: ObservableObject {
                         at: assistantIdx
                     )
                     self.finishStreaming(at: assistantIdx)
+                    // Route an auth-class failure straight back to the
+                    // API-key setup sheet rather than leaving the user with
+                    // a generic error banner.
+                    if case let .apiError(_, kind) = (error as? AIWritingServiceError) ?? .invalidResponse,
+                       kind == .auth {
+                        self.startAddingKey(snapshotModel.provider)
+                    }
                 }
             }
         }
@@ -479,6 +511,17 @@ final class AppState: ObservableObject {
         conversations[convoIdx].messages[idx].blocks = blocks
         conversations[convoIdx].messages[idx].text = MockGenerator.plainText(from: blocks)
         conversations[convoIdx].updatedAt = Date()
+    }
+
+    /// Persist the OpenAI Responses `response.id` captured from the SSE
+    /// stream onto the assistant message. Anchored to a specific
+    /// conversation id so a stream that finishes after the user switches
+    /// conversations doesn't pollute the wrong thread.
+    private func recordResponseID(_ id: String, conversationID: String?, assistantIdx: Int) {
+        guard let conversationID,
+              let convoIdx = conversations.firstIndex(where: { $0.id == conversationID }),
+              conversations[convoIdx].messages.indices.contains(assistantIdx) else { return }
+        conversations[convoIdx].messages[assistantIdx].providerResponseID = id
     }
 
     private func finishStreaming(at idx: Int) {
@@ -544,11 +587,16 @@ final class AppState: ObservableObject {
         guard messagesBefore.last(where: { $0.role == .user }) != nil else { return }
         conversations[convoIdx].messages[pinnedIdx].blocks = []
         conversations[convoIdx].messages[pinnedIdx].text = ""
+        // Drop the prior response chain on the regenerated turn — the new
+        // stream will assign a fresh one.
+        conversations[convoIdx].messages[pinnedIdx].providerResponseID = nil
         let assistantIdx = pinnedIdx
         streamingMessageIndex = assistantIdx
         if AIWritingService.supports(model.provider),
            let apiKey = APIKeyStore.read(for: model.provider) {
-            startLiveStream(apiKey: apiKey, assistantIdx: assistantIdx)
+            // Per design: regenerate always sends the full transcript so we
+            // don't have to walk back to a prior-prior providerResponseID.
+            startLiveStream(apiKey: apiKey, assistantIdx: assistantIdx, useResponseChain: false)
         } else {
             let lastUser = messagesBefore.last(where: { $0.role == .user })
             startMockStream(userText: lastUser?.text ?? "", assistantIdx: assistantIdx)

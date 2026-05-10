@@ -70,6 +70,7 @@
 		WBBLD000000000000000075 /* AnthropicWebSearchDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */; };
 		WBBLD000000000000000078 /* CitationPillsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000078 /* CitationPillsTests.swift */; };
 		WBBLD000000000000000079 /* CodeSessionRollTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000079 /* CodeSessionRollTests.swift */; };
+		WBBLD000000000000000080 /* APIErrorKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000080 /* APIErrorKindTests.swift */; };
 		WBBLD000000000000000076 /* ToolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000076 /* ToolCardView.swift */; };
 		WBBLD000000000000000077 /* CitationPills.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000077 /* CitationPills.swift */; };
 		WBBLD000000000000000067 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000067 /* Conversation.swift */; };
@@ -140,6 +141,7 @@
 		WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicWebSearchDecodingTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000078 /* CitationPillsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationPillsTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000079 /* CodeSessionRollTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeSessionRollTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000080 /* APIErrorKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIErrorKindTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000076 /* ToolCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCardView.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000077 /* CitationPills.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationPills.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000067 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
@@ -196,6 +198,7 @@
 				WBFILE00000000000000075 /* AnthropicWebSearchDecodingTests.swift */,
 				WBFILE00000000000000078 /* CitationPillsTests.swift */,
 				WBFILE00000000000000079 /* CodeSessionRollTests.swift */,
+				WBFILE00000000000000080 /* APIErrorKindTests.swift */,
 			);
 			path = ContextDeskTests;
 			sourceTree = "<group>";
@@ -482,6 +485,7 @@
 				WBBLD000000000000000075 /* AnthropicWebSearchDecodingTests.swift in Sources */,
 				WBBLD000000000000000078 /* CitationPillsTests.swift in Sources */,
 				WBBLD000000000000000079 /* CodeSessionRollTests.swift in Sources */,
+				WBBLD000000000000000080 /* APIErrorKindTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

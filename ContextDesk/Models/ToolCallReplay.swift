@@ -128,7 +128,7 @@ enum ToolCallReplay {
 
     private static func plainText(of block: OutputBlock) -> String {
         switch block {
-        case .paragraph(let t):     return t
+        case .paragraph(let t, _):  return t
         case .heading(let t):       return t
         case .bulletList(let it):   return it.map { "- \($0)" }.joined(separator: "\n")
         case .table(_, let rows):   return rows.map { $0.joined(separator: " | ") }.joined(separator: "\n")

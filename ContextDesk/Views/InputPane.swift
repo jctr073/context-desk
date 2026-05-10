@@ -443,8 +443,8 @@ private struct AssistantBlocks: View {
     @ViewBuilder
     private func renderBlock(_ block: OutputBlock, registry: CitationRegistry) -> some View {
         switch block {
-        case .paragraph(let text):
-            ProseTextBuilder.text(text, registry: registry, palette: palette)
+        case .paragraph(let text, let citations):
+            ProseTextBuilder.text(text, registry: registry, palette: palette, structuredCitations: citations)
                 .font(.system(size: 13))
                 .lineSpacing(13 * 0.6)
                 .foregroundColor(palette.text)

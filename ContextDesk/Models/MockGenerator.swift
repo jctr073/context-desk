@@ -58,7 +58,7 @@ enum MockGenerator {
     static func plainText(from blocks: [OutputBlock]) -> String {
         blocks.map { block -> String in
             switch block {
-            case .paragraph(let t):    return t
+            case .paragraph(let t, _): return t
             case .heading:             return ""
             case .bulletList(let it):  return it.joined(separator: " ")
             case .table(_, let rows):  return rows.flatMap { $0 }.joined(separator: " ")

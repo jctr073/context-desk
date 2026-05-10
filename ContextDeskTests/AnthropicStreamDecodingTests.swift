@@ -69,7 +69,7 @@ final class AnthropicStreamDecodingTests: XCTestCase {
         do {
             _ = try await collect(events)
             XCTFail("expected stream to throw")
-        } catch let AIWritingServiceError.apiError(message) {
+        } catch let AIWritingServiceError.apiError(message, _) {
             XCTAssertEqual(message, "overloaded")
         } catch {
             XCTFail("expected .apiError, got \(error)")

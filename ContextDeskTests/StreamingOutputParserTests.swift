@@ -45,6 +45,20 @@ final class StreamingOutputParserTests: XCTestCase {
         XCTAssertEqual(maxCompleted, canonical.count)
     }
 
+    func testParagraphWithCitationsParsesEnd() throws {
+        // The streaming parser only renders text in its preview path. The
+        // structured `citations` field arrives at the *end* of a block, so
+        // it materializes only once `finish()` (or a closing brace) is
+        // observed. This test pins that contract.
+        let json = #"{"blocks":[{"kind":"paragraph","text":"X is true.","citations":[{"tool_call_id":"ws_1","hit_index":2}]}]}"#
+        let parser = StreamingOutputParser()
+        parser.feed(json)
+        let result = try parser.finish()
+        XCTAssertEqual(result, [
+            .paragraph(text: "X is true.", citations: [Citation(toolCallID: "ws_1", hitIndex: 2)]),
+        ])
+    }
+
     func testSplitInMiddleOfText() throws {
         let json = #"{"blocks":[{"kind":"paragraph","text":"hello"}]}"#
         let parts = [
@@ -75,7 +89,7 @@ final class StreamingOutputParserTests: XCTestCase {
         let parser = StreamingOutputParser()
         parser.feed(first)
         // Mid-split: trailing lone backslash must be dropped from preview.
-        if case let .paragraph(text)? = parser.snapshot.last {
+        if case let .paragraph(text, _)? = parser.snapshot.last {
             XCTAssertFalse(text.contains("\\"))
         }
         parser.feed(rest)
@@ -99,7 +113,7 @@ final class StreamingOutputParserTests: XCTestCase {
         let parser = StreamingOutputParser()
         parser.feed(first)
         // The partial \u00 (with fewer than 4 hex digits) must be dropped.
-        if case let .paragraph(text)? = parser.snapshot.last {
+        if case let .paragraph(text, _)? = parser.snapshot.last {
             XCTAssertEqual(text, "caf")
         } else {
             XCTFail("expected paragraph preview")

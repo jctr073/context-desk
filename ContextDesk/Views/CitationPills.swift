@@ -92,6 +92,29 @@ struct CitationRegistry {
         return CitationRegistry(byIndex: byIndex, flat: flat)
     }
 
+    /// URLs that appear behind `<cite index="…">` tags in the prose of
+    /// `blocks`. Used by the sources-first card to badge which rows are
+    /// actually referenced inline.
+    func citedURLs(in blocks: [OutputBlock]) -> Set<String> {
+        var out: Set<String> = []
+        for block in blocks {
+            let text: String
+            switch block {
+            case .paragraph(let t): text = t
+            case .heading(let t):   text = t
+            case .bulletList(let items): text = items.joined(separator: "\n")
+            case .table(_, let rows): text = rows.flatMap { $0 }.joined(separator: "\n")
+            default: continue
+            }
+            for segment in CitationParser.parse(text) {
+                if case .cite(_, let index) = segment, let src = lookup(index) {
+                    out.insert(src.url)
+                }
+            }
+        }
+        return out
+    }
+
     func lookup(_ index: String) -> CitationSource? {
         if let direct = byIndex[index] { return direct }
         // Flat fallback: "N" → flat[N-1].

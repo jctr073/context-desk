@@ -24,8 +24,7 @@ deterministic mock output for now.
   chat thread, and a resizable/hideable output canvas.
 - Chat mode operations for Ask / Plan / Summarize / Compare / Translate, plus
   writing mode operations for Rephrase / Expand / Shorten / Clean up.
-- Output format toolbar with Auto / Paragraphs / Bullets / Tables chips, plus
-  Markdown and Slack mrkdwn raw-output views.
+- Output canvas toolbar with Markdown and Slack mrkdwn raw-output views.
 - Conversation-wide custom instructions that are applied alongside the selected
   operation.
 - Conversation-wide context text and images that are sent with each live
@@ -47,11 +46,12 @@ deterministic mock output for now.
   input.
 - Rendered output supports paragraphs, headings, bullet lists, tables, and
   syntax-highlighted code blocks.
-- Tool activity renders inline as compact cards: web search shows a smart
-  summary of result titles + favicons + domains, web fetch shows the fetched
-  URL with an expandable preview, and consecutive code-execution steps roll
-  up into one collapsible session. `<cite>` tags in the prose are replaced
-  with inline favicon pills linking to the cited source.
+- Tool activity renders as a single sources-first card per reply: a vertical
+  list of searched/read sources (favicon + title + domain, with a "cited"
+  badge on the ones referenced inline), plus footer pellets that demote
+  noisier activity (code steps, fetches, warnings) to click-to-expand
+  summaries. `<cite>` tags in the prose are replaced with inline favicon
+  pills linking to the cited source.
 - Live OpenAI / Anthropic responses stream incrementally through Server-Sent
   Events; Gemini uses the deterministic mock stream until live support is wired
   up.

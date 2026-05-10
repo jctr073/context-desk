@@ -415,35 +415,28 @@ private struct AssistantBlocks: View {
     let palette: Palette
     var body: some View {
         let registry = CitationRegistry.build(from: blocks)
+        let cited = registry.citedURLs(in: blocks)
         VStack(alignment: .leading, spacing: 0) {
             let clusters = ToolUnitWalker.cluster(ToolUnitWalker.walk(blocks))
             ForEach(Array(clusters.enumerated()), id: \.offset) { _, cluster in
-                renderCluster(cluster, registry: registry)
+                renderCluster(cluster, registry: registry, cited: cited)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
-    private func renderCluster(_ cluster: ToolUnitWalker.Cluster, registry: CitationRegistry) -> some View {
+    private func renderCluster(
+        _ cluster: ToolUnitWalker.Cluster,
+        registry: CitationRegistry,
+        cited: Set<String>
+    ) -> some View {
         switch cluster {
         case .block(let block):
             renderBlock(block, registry: registry)
         case .toolCluster(let units):
-            if units.count == 1, let unit = units.first {
-                ToolCardView(
-                    id: unit.call.id,
-                    toolName: unit.call.name,
-                    argumentsJSON: unit.call.argumentsJSON,
-                    resultContent: unit.result?.content,
-                    isError: unit.result?.isError ?? false,
-                    palette: palette
-                )
+            SourcesFirstCard(units: units, citedURLs: cited, palette: palette)
                 .padding(.bottom, 10)
-            } else {
-                ToolGroupView(units: units, palette: palette)
-                    .padding(.bottom, 10)
-            }
         }
     }
 

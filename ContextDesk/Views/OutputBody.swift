@@ -13,11 +13,12 @@ struct OutputBody: View {
             switch renderMode {
             case .rendered:
                 let registry = CitationRegistry.build(from: blocks)
+                let cited = registry.citedURLs(in: blocks)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         let clusters = ToolUnitWalker.cluster(ToolUnitWalker.walk(blocks))
                         ForEach(Array(clusters.enumerated()), id: \.offset) { _, cluster in
-                            renderCluster(cluster, registry: registry)
+                            renderCluster(cluster, registry: registry, cited: cited)
                         }
                     }
                     .padding(.horizontal, 18)
@@ -33,45 +34,19 @@ struct OutputBody: View {
     }
 
     @ViewBuilder
-    private func renderCluster(_ cluster: ToolUnitWalker.Cluster, registry: CitationRegistry) -> some View {
+    private func renderCluster(
+        _ cluster: ToolUnitWalker.Cluster,
+        registry: CitationRegistry,
+        cited: Set<String>
+    ) -> some View {
         switch cluster {
         case .block(let block):
             renderBlock(block, registry: registry)
         case .toolCluster(let units):
-            if units.count == 1, let unit = units.first {
-                if ToolKind.from(name: unit.call.name) == .code {
-                    CodeSessionRollView(units: [unit], palette: palette)
-                        .frame(maxWidth: 760, alignment: .leading)
-                        .padding(.bottom, 12)
-                } else {
-                    ToolCardView(
-                        id: unit.call.id,
-                        toolName: unit.call.name,
-                        argumentsJSON: unit.call.argumentsJSON,
-                        resultContent: unit.result?.content,
-                        isError: unit.result?.isError ?? false,
-                        palette: palette,
-                        defaultExpanded: shouldDefaultExpand(unit)
-                    )
-                    .frame(maxWidth: 760, alignment: .leading)
-                    .padding(.bottom, 12)
-                }
-            } else if units.allSatisfy({ ToolKind.from(name: $0.call.name) == .code }) {
-                CodeSessionRollView(units: units, palette: palette)
-                    .frame(maxWidth: 760, alignment: .leading)
-                    .padding(.bottom, 12)
-            } else {
-                ToolGroupView(units: units, palette: palette)
-                    .frame(maxWidth: 760, alignment: .leading)
-                    .padding(.bottom, 12)
-            }
+            SourcesFirstCard(units: units, citedURLs: cited, palette: palette)
+                .frame(maxWidth: 760, alignment: .leading)
+                .padding(.bottom, 12)
         }
-    }
-
-    private func shouldDefaultExpand(_ unit: ToolUnit) -> Bool {
-        guard let result = unit.result, !result.isError else { return false }
-        guard ToolKind.from(name: unit.call.name) == .webSearch else { return false }
-        return !ToolResultParser.webSearchHits(from: result.content).isEmpty
     }
 
     @ViewBuilder

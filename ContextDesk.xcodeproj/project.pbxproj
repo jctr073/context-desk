@@ -13,7 +13,6 @@
 		WBBLD000000000000000003 /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000003 /* Palette.swift */; };
 		WBBLD000000000000000004 /* Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000004 /* Layout.swift */; };
 		WBBLD000000000000000005 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000005 /* Operation.swift */; };
-		WBBLD000000000000000006 /* OutputFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000006 /* OutputFormat.swift */; };
 		WBBLD000000000000000007 /* OutputBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000007 /* OutputBlock.swift */; };
 		WBBLD000000000000000008 /* RecentItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000008 /* RecentItem.swift */; };
 		WBBLD000000000000000009 /* AIModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000009 /* AIModel.swift */; };
@@ -83,7 +82,6 @@
 		WBFILE00000000000000003 /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000004 /* Layout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Layout.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000005 /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
-		WBFILE00000000000000006 /* OutputFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputFormat.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000007 /* OutputBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputBlock.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000008 /* RecentItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentItem.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000009 /* AIModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModel.swift; sourceTree = "<group>"; };
@@ -238,7 +236,6 @@
 			isa = PBXGroup;
 			children = (
 				WBFILE00000000000000005 /* Operation.swift */,
-				WBFILE00000000000000006 /* OutputFormat.swift */,
 				WBFILE00000000000000041 /* OutputContainerFormat.swift */,
 				WBFILE00000000000000007 /* OutputBlock.swift */,
 				WBFILE00000000000000033 /* OutputBlock+Markdown.swift */,
@@ -418,7 +415,6 @@
 				WBBLD000000000000000003 /* Palette.swift in Sources */,
 				WBBLD000000000000000004 /* Layout.swift in Sources */,
 				WBBLD000000000000000005 /* Operation.swift in Sources */,
-				WBBLD000000000000000006 /* OutputFormat.swift in Sources */,
 				WBBLD000000000000000007 /* OutputBlock.swift in Sources */,
 				WBBLD000000000000000008 /* RecentItem.swift in Sources */,
 				WBBLD000000000000000067 /* Conversation.swift in Sources */,
@@ -611,7 +607,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -624,7 +620,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -639,7 +635,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -652,7 +648,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -665,10 +661,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -683,10 +679,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

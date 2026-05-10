@@ -57,7 +57,6 @@ struct Conversation: Identifiable, Hashable, Codable {
     var webAccessEnabled: Bool
     var modelID: String
     var operationID: String
-    var formats: Set<OutputFormat>
     var containerFormat: OutputContainerFormat
     var messages: [ChatMessage]
     let createdAt: Date
@@ -73,7 +72,6 @@ struct Conversation: Identifiable, Hashable, Codable {
         webAccessEnabled: Bool = false,
         modelID: String,
         operationID: String,
-        formats: Set<OutputFormat> = [],
         containerFormat: OutputContainerFormat = .markdown,
         messages: [ChatMessage] = [],
         createdAt: Date = Date(),
@@ -88,7 +86,6 @@ struct Conversation: Identifiable, Hashable, Codable {
         self.webAccessEnabled = webAccessEnabled
         self.modelID = modelID
         self.operationID = operationID
-        self.formats = formats
         self.containerFormat = containerFormat
         self.messages = messages
         self.createdAt = createdAt
@@ -106,7 +103,6 @@ struct Conversation: Identifiable, Hashable, Codable {
         self.webAccessEnabled = (try? c.decode(Bool.self, forKey: .webAccessEnabled)) ?? false
         self.modelID = try c.decode(String.self, forKey: .modelID)
         self.operationID = try c.decode(String.self, forKey: .operationID)
-        self.formats = try c.decode(Set<OutputFormat>.self, forKey: .formats)
         self.containerFormat = try c.decode(OutputContainerFormat.self, forKey: .containerFormat)
         self.messages = try c.decode([ChatMessage].self, forKey: .messages)
         self.createdAt = try c.decode(Date.self, forKey: .createdAt)
@@ -115,7 +111,7 @@ struct Conversation: Identifiable, Hashable, Codable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, mode, customInstructions, contextText, contextImages, webAccessEnabled
-        case modelID, operationID, formats, containerFormat, messages
+        case modelID, operationID, containerFormat, messages
         case createdAt, updatedAt
     }
 
@@ -294,7 +290,6 @@ enum ConversationStore {
                 customInstructions: "",
                 modelID: item.modelID,
                 operationID: item.operationID,
-                formats: item.formats,
                 containerFormat: item.containerFormat,
                 messages: [userMsg, assistantMsg],
                 createdAt: item.createdAt,

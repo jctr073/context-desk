@@ -23,51 +23,6 @@ final class CodeSessionRollTests: XCTestCase {
         )
     }
 
-    // MARK: subCluster
-
-    func testSubClusterAllCode() {
-        let units = [codeUnit(id: "1", code: "a()"), codeUnit(id: "2", code: "b()")]
-        let subs = ToolUnitWalker.subCluster(units)
-        XCTAssertEqual(subs.count, 1)
-        if case .codeRun(let run) = subs[0] {
-            XCTAssertEqual(run.count, 2)
-        } else {
-            XCTFail("expected codeRun")
-        }
-    }
-
-    func testSubClusterMixedSplitsCodeRunsFromSingles() {
-        let units = [
-            searchUnit(id: "s1"),
-            codeUnit(id: "c1", code: "a()"),
-            codeUnit(id: "c2", code: "b()"),
-            searchUnit(id: "s2"),
-            codeUnit(id: "c3", code: "c()"),
-        ]
-        let subs = ToolUnitWalker.subCluster(units)
-        XCTAssertEqual(subs.count, 4)
-        guard case .single = subs[0],
-              case .codeRun(let run) = subs[1],
-              case .single = subs[2],
-              case .codeRun(let tail) = subs[3]
-        else { return XCTFail("unexpected sub-cluster pattern") }
-        XCTAssertEqual(run.count, 2)
-        XCTAssertEqual(tail.count, 1)
-    }
-
-    func testSubClusterEmpty() {
-        XCTAssertTrue(ToolUnitWalker.subCluster([]).isEmpty)
-    }
-
-    func testSubClusterAllSearches() {
-        let units = [searchUnit(id: "1"), searchUnit(id: "2")]
-        let subs = ToolUnitWalker.subCluster(units)
-        XCTAssertEqual(subs.count, 2)
-        for s in subs {
-            if case .single = s { continue } else { XCTFail("expected single") }
-        }
-    }
-
     // MARK: ToolKind code coverage
 
     func testToolKindCodeMatchesAllCodeNames() {

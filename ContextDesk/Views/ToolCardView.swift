@@ -475,141 +475,6 @@ private struct FaviconBadge: View {
     }
 }
 
-// MARK: - ToolGroupView
-
-/// Wraps a cluster of consecutive tool units in a Codex-style "Worked for"
-/// header. Single-unit clusters skip the wrapper entirely.
-struct ToolGroupView: View {
-    let units: [ToolUnit]
-    let palette: Palette
-
-    @State private var expanded: Bool
-
-    init(units: [ToolUnit], palette: Palette) {
-        self.units = units
-        self.palette = palette
-        // Default-expand any group that has at least one running call so
-        // the user sees activity; otherwise default-expand too — the user
-        // wanted to see the smart summary out of the box.
-        _expanded = State(initialValue: true)
-    }
-
-    private var anyRunning: Bool {
-        units.contains(where: { $0.result == nil })
-    }
-    private var totalSources: Int {
-        units.reduce(0) { acc, unit in
-            guard let result = unit.result, !result.isError else { return acc }
-            let kind = ToolKind.from(name: unit.call.name)
-            guard kind == .webSearch else { return acc }
-            return acc + ToolResultParser.webSearchHits(from: result.content).count
-        }
-    }
-    private var headerTitle: String {
-        if anyRunning { return "Working" }
-        return "Worked"
-    }
-    private var headerMeta: String {
-        var parts: [String] = []
-        let toolCount = units.count
-        parts.append("\(toolCount) tool\(toolCount == 1 ? "" : "s")")
-        if totalSources > 0 {
-            parts.append("\(totalSources) source\(totalSources == 1 ? "" : "s")")
-        }
-        return parts.joined(separator: ", ")
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
-                }
-
-            if expanded {
-                Divider().background(palette.border)
-                VStack(spacing: 8) {
-                    ForEach(Array(ToolUnitWalker.subCluster(units).enumerated()), id: \.offset) { _, sub in
-                        switch sub {
-                        case .codeRun(let codeUnits):
-                            CodeSessionRollView(units: codeUnits, palette: palette)
-                        case .single(let unit):
-                            ToolCardView(
-                                id: unit.call.id,
-                                toolName: unit.call.name,
-                                argumentsJSON: unit.call.argumentsJSON,
-                                resultContent: unit.result?.content,
-                                isError: unit.result?.isError ?? false,
-                                palette: palette,
-                                defaultExpanded: defaultExpanded(for: unit)
-                            )
-                        }
-                    }
-                }
-                .padding(8)
-            }
-        }
-        .background(palette.text.opacity(0.018))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(palette.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    /// Expand the first card in the group that has a smart summary.
-    private func defaultExpanded(for unit: ToolUnit) -> Bool {
-        guard let result = unit.result, !result.isError else { return false }
-        let kind = ToolKind.from(name: unit.call.name)
-        guard kind == .webSearch else { return false }
-        let hits = ToolResultParser.webSearchHits(from: result.content)
-        guard !hits.isEmpty else { return false }
-        for prior in units {
-            if prior.call.id == unit.call.id { return true }
-            if let r = prior.result, !r.isError,
-               ToolKind.from(name: prior.call.name) == .webSearch,
-               !ToolResultParser.webSearchHits(from: r.content).isEmpty {
-                return false
-            }
-        }
-        return true
-    }
-
-    private var header: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(palette.accent.opacity(0.16))
-                    .frame(width: 22, height: 22)
-                    .overlay(
-                        Circle().stroke(palette.accent.opacity(0.45), lineWidth: 1)
-                    )
-                Image(systemName: anyRunning ? "bolt.fill" : "bolt")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(palette.accent)
-            }
-
-            Text(headerTitle)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(palette.text)
-
-            Text("· \(headerMeta)")
-                .font(.system(size: 11.5))
-                .foregroundColor(palette.muted)
-
-            Spacer(minLength: 0)
-
-            Image(systemName: "chevron.down")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(palette.muted)
-                .rotationEffect(.degrees(expanded ? 0 : -90))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-    }
-}
-
 // MARK: - ToolUnit pairing
 
 /// One tool-call card render unit: a `.toolCall` and (optionally) its
@@ -696,194 +561,479 @@ enum ToolUnitWalker {
         return out
     }
 
-    /// Sub-cluster within a tool group: a run of consecutive code-execution
-    /// units rolls into a `CodeSessionRollView`; everything else stays a
-    /// single `ToolCardView`.
-    enum SubCluster {
-        case codeRun([ToolUnit])
-        case single(ToolUnit)
-    }
-
-    static func subCluster(_ units: [ToolUnit]) -> [SubCluster] {
-        var out: [SubCluster] = []
-        var codeRun: [ToolUnit] = []
-        func flushCode() {
-            if !codeRun.isEmpty {
-                out.append(.codeRun(codeRun))
-                codeRun.removeAll()
-            }
-        }
-        for u in units {
-            if ToolKind.from(name: u.call.name) == .code {
-                codeRun.append(u)
-            } else {
-                flushCode()
-                out.append(.single(u))
-            }
-        }
-        flushCode()
-        return out
-    }
 }
 
-// MARK: - CodeSessionRollView
+// MARK: - SourcesFirstCard
 
-/// "Rolled-up" code-execution session — a single collapsible card with
-/// numbered, monospace lines per step. Collapsed by default.
-struct CodeSessionRollView: View {
+/// One unified card per cluster of tool activity — a vertical "Searched &
+/// read N sources" list at the top, with a footer of click-to-expand
+/// pellets summarizing the demoted noise (code steps, fetches without
+/// titles, errors). Replaces the prior per-tool cards plus their group
+/// wrapper.
+struct SourcesFirstCard: View {
     let units: [ToolUnit]
+    let citedURLs: Set<String>
     let palette: Palette
 
-    @State private var expanded: Bool = false
+    @State private var expanded: Bool = true
+    @State private var openPellets: Set<PelletKind> = []
 
-    private var errorCount: Int {
-        units.reduce(0) { $0 + ((($1.result?.isError) == true) ? 1 : 0) }
+    enum PelletKind: Hashable { case code, fetch, warning }
+
+    private struct SourceRow: Identifiable {
+        let id = UUID()
+        let url: String
+        let title: String
+        let domain: String
+        let cited: Bool
+        let faviconLetters: String
     }
+
+    // MARK: Aggregation
+
+    private var sources: [SourceRow] {
+        var seen: Set<String> = []
+        var out: [SourceRow] = []
+        for unit in units {
+            guard let result = unit.result, !result.isError else { continue }
+            switch ToolKind.from(name: unit.call.name) {
+            case .webSearch:
+                for hit in ToolResultParser.webSearchHits(from: result.content) {
+                    guard !seen.contains(hit.url) else { continue }
+                    seen.insert(hit.url)
+                    out.append(SourceRow(
+                        url: hit.url,
+                        title: hit.title,
+                        domain: hit.domain,
+                        cited: citedURLs.contains(hit.url),
+                        faviconLetters: hit.faviconLetters
+                    ))
+                }
+            case .webFetch:
+                guard let url = fetchURL(from: unit.call.argumentsJSON),
+                      !seen.contains(url) else { continue }
+                seen.insert(url)
+                let source = CitationSource(
+                    url: url,
+                    title: fetchTitle(from: result.content) ?? url
+                )
+                out.append(SourceRow(
+                    url: url,
+                    title: source.title,
+                    domain: source.host,
+                    cited: citedURLs.contains(url),
+                    faviconLetters: source.faviconLetters
+                ))
+            default:
+                break
+            }
+        }
+        return out
+    }
+
+    private var codeUnits: [ToolUnit] {
+        units.filter { ToolKind.from(name: $0.call.name) == .code }
+    }
+
+    /// Errors stand alone as a "warnings" pellet — the user wanted them
+    /// surfaced even though their underlying call already shows up in
+    /// the relevant kind's bucket.
+    private var errorUnits: [ToolUnit] {
+        units.filter { ($0.result?.isError ?? false) }
+    }
+
     private var anyRunning: Bool {
         units.contains(where: { $0.result == nil })
     }
-    private var latestLine: String {
-        for unit in units.reversed() {
-            if let line = ToolResultParser.extractedArgument(
-                name: unit.call.name, argumentsJSON: unit.call.argumentsJSON
-            ) {
-                return line
+
+    private var primaryKind: ToolKind {
+        if !sources.isEmpty {
+            // Prefer search if any unit produced search hits.
+            if units.contains(where: { ToolKind.from(name: $0.call.name) == .webSearch
+                                       && (($0.result.map { !$0.isError && !ToolResultParser.webSearchHits(from: $0.content).isEmpty }) ?? false) }) {
+                return .webSearch
             }
+            return .webFetch
         }
-        return ""
-    }
-    private var latestPreview: String {
-        let count = units.count
-        let stepWord = count == 1 ? "step" : "steps"
-        if latestLine.isEmpty { return "\(count) \(stepWord)" }
-        return "\(count) \(stepWord) · last: \(latestLine)"
-    }
-    private var metaText: String {
-        if anyRunning {
-            return errorCount > 0 ? "\(errorCount) errors · running" : "running"
-        }
-        if errorCount > 0 {
-            return "\(errorCount) error\(errorCount == 1 ? "" : "s")"
-        }
-        return ""
+        if !codeUnits.isEmpty { return .code }
+        return .generic
     }
 
-    private static let codeTint = Color(hex: 0xBF5AF2)
+    private var headerLabel: String {
+        let n = sources.count
+        let cN = codeUnits.count
+        switch primaryKind {
+        case .webSearch:
+            return anyRunning
+                ? "Searching the web"
+                : "Searched & read \(n) source\(n == 1 ? "" : "s")"
+        case .webFetch:
+            return anyRunning
+                ? "Fetching"
+                : "Fetched \(n) page\(n == 1 ? "" : "s")"
+        case .code:
+            return anyRunning
+                ? "Running code"
+                : "Code analysis · \(cN) step\(cN == 1 ? "" : "s")"
+        case .generic:
+            return anyRunning ? "Running tool" : "Tool activity"
+        }
+    }
+
+    /// First search query encountered, monospace-displayed beside the
+    /// label like the design's `qy` slot.
+    private var headerQuery: String? {
+        for unit in units where ToolKind.from(name: unit.call.name) == .webSearch {
+            if let q = ToolResultParser.extractedArgument(name: unit.call.name, argumentsJSON: unit.call.argumentsJSON) {
+                return q
+            }
+        }
+        return nil
+    }
+
+    private var hasExpandableBody: Bool {
+        !sources.isEmpty || !pellets.isEmpty
+    }
+
+    // MARK: Pellets
+
+    private struct Pellet { let kind: PelletKind; let count: Int; let units: [ToolUnit] }
+
+    private var pellets: [Pellet] {
+        var out: [Pellet] = []
+        if !codeUnits.isEmpty {
+            out.append(Pellet(kind: .code, count: codeUnits.count, units: codeUnits))
+        }
+        // Fetches whose URL didn't make it into sources (rare — malformed
+        // payload). Counted by parsing the args.
+        let strandedFetches = units.filter {
+            ToolKind.from(name: $0.call.name) == .webFetch
+                && fetchURL(from: $0.call.argumentsJSON) == nil
+        }
+        if !strandedFetches.isEmpty {
+            out.append(Pellet(kind: .fetch, count: strandedFetches.count, units: strandedFetches))
+        }
+        if !errorUnits.isEmpty {
+            out.append(Pellet(kind: .warning, count: errorUnits.count, units: errorUnits))
+        }
+        return out
+    }
+
+    // MARK: View
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    guard hasExpandableBody else { return }
                     withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
                 }
-            if expanded {
+
+            if expanded && !sources.isEmpty {
                 Divider().background(palette.border)
-                bodyRows
+                sourceList
+            }
+            if expanded && !pellets.isEmpty {
+                pelletFooter
             }
         }
-        .background(palette.text.opacity(0.025))
+        .background(cardBackground)
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(palette.border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Self.codeTint.opacity(0.14))
-                    .frame(width: 24, height: 24)
-                Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Self.codeTint)
-            }
+            iconBadge
 
-            Text("CODE SESSION")
-                .font(.system(size: 10.5, weight: .semibold))
-                .tracking(0.5)
-                .foregroundColor(palette.muted)
-                .fixedSize()
-
-            Text(latestPreview)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(palette.text.opacity(0.55))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            if !metaText.isEmpty {
-                Text(metaText)
-                    .font(.system(size: 11))
-                    .monospacedDigit()
-                    .foregroundColor(errorCount > 0 ? Color(hex: 0xFF453A) : palette.muted)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(headerLabel)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(palette.text)
+                    .lineLimit(1)
                     .fixedSize()
-            }
-
-            Image(systemName: "chevron.down")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(palette.muted)
-                .rotationEffect(.degrees(expanded ? 0 : -90))
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 10)
-    }
-
-    private var bodyRows: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(units.enumerated()), id: \.offset) { idx, unit in
-                    row(idx: idx + 1, unit: unit)
+                if let headerQuery {
+                    Text(headerQuery)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(palette.text.opacity(0.55))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
-            .padding(.vertical, 8)
-        }
-        .frame(maxHeight: 280)
-        .background(Color.black.opacity(0.18))
-    }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-    @ViewBuilder
-    private func row(idx: Int, unit: ToolUnit) -> some View {
-        let line = ToolResultParser.extractedArgument(
-            name: unit.call.name, argumentsJSON: unit.call.argumentsJSON
-        ) ?? ""
-        let isError = (unit.result?.isError ?? false)
-        let isComment = line.trimmingCharacters(in: .whitespaces).hasPrefix("#")
-
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(String(format: "%02d", idx))
-                .font(.system(size: 12, design: .monospaced))
-                .monospacedDigit()
-                .foregroundColor(isError ? Color(hex: 0xFF453A) : palette.text.opacity(0.25))
-                .frame(width: 28, alignment: .trailing)
-
-            Text(line)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(rowColor(isError: isError, isComment: isComment))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
-
-            if isError {
-                Text("\u{2715}")
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundColor(Color(hex: 0xFF453A))
-            } else if unit.result == nil {
-                Text("…")
-                    .font(.system(size: 10.5, design: .monospaced))
+            if hasExpandableBody {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(palette.muted)
+                    .rotationEffect(.degrees(expanded ? 0 : -90))
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 3)
+        .padding(.vertical, 11)
     }
 
-    private func rowColor(isError: Bool, isComment: Bool) -> Color {
-        if isError { return Color(hex: 0xFF8E88) }
-        if isComment { return palette.text.opacity(0.45) }
-        return palette.text
+    private var iconBadge: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(primaryKind.tint.opacity(0.14))
+                .frame(width: 26, height: 26)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(primaryKind.tint.opacity(0.45), lineWidth: 1)
+                        .opacity(anyRunning ? 1 : 0)
+                )
+            Image(systemName: primaryKind.symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(primaryKind.tint)
+        }
+    }
+
+    private var sourceList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(sources.enumerated()), id: \.offset) { idx, src in
+                sourceRow(src, isLast: idx == sources.count - 1)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 4)
+    }
+
+    private func sourceRow(_ src: SourceRow, isLast: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                FaviconBadge(letters: src.faviconLetters)
+                Text(src.title)
+                    .font(.system(size: 12.5))
+                    .foregroundColor(palette.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if src.cited {
+                    Text("cited")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Color(hex: 0x5CD97A))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(hex: 0x30D158).opacity(0.12))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Color(hex: 0x30D158).opacity(0.2), lineWidth: 1)
+                        )
+                }
+                Text(src.domain)
+                    .font(.system(size: 11.5))
+                    .foregroundColor(palette.muted)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .padding(.vertical, 8)
+
+            if !isLast {
+                Rectangle().fill(palette.border.opacity(0.4)).frame(height: 0.5)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { ExternalURLPolicy.openWebURL(from: src.url) }
+    }
+
+    @ViewBuilder
+    private var pelletFooter: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                ForEach(Array(pellets.enumerated()), id: \.offset) { _, p in
+                    pelletButton(p)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+
+            ForEach(Array(pellets.enumerated()), id: \.offset) { _, p in
+                if openPellets.contains(p.kind) {
+                    pelletDetail(p)
+                }
+            }
+        }
+        .background(Color.black.opacity(0.16))
+        .overlay(alignment: .top) {
+            Rectangle().fill(palette.border).frame(height: 0.5)
+        }
+    }
+
+    private func pelletButton(_ p: Pellet) -> some View {
+        let open = openPellets.contains(p.kind)
+        return HStack(spacing: 6) {
+            Image(systemName: pelletSymbol(p.kind))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(pelletColor(p.kind))
+            Text("\(p.count)")
+                .font(.system(size: 11.5, weight: .semibold))
+                .monospacedDigit()
+                .foregroundColor(palette.text)
+            Text(pelletLabel(p.kind, count: p.count))
+                .font(.system(size: 11.5))
+                .foregroundColor(palette.text.opacity(0.7))
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 10)
+        .padding(.vertical, 3)
+        .background(
+            Capsule(style: .continuous)
+                .fill(pelletBackground(p.kind, open: open))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(pelletBorder(p.kind, open: open), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                if openPellets.contains(p.kind) {
+                    openPellets.remove(p.kind)
+                } else {
+                    openPellets.insert(p.kind)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pelletDetail(_ p: Pellet) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(pelletLabel(p.kind, count: p.count).uppercased() + " · \(p.count)")
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(0.5)
+                .foregroundColor(palette.muted)
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            ForEach(Array(p.units.enumerated()), id: \.offset) { idx, unit in
+                pelletDetailRow(unit, isLast: idx == p.units.count - 1)
+            }
+        }
+        .padding(.bottom, 6)
+        .overlay(alignment: .top) {
+            Rectangle().fill(palette.border.opacity(0.6)).frame(height: 0.5)
+        }
+    }
+
+    private func pelletDetailRow(_ unit: ToolUnit, isLast: Bool) -> some View {
+        let isError = unit.result?.isError ?? false
+        let isRunning = unit.result == nil
+        let arg: String = {
+            if let line = ToolResultParser.extractedArgument(
+                name: unit.call.name, argumentsJSON: unit.call.argumentsJSON
+            ) { return line }
+            return unit.call.name
+        }()
+        return VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(isError
+                          ? Color(hex: 0xFF453A)
+                          : (isRunning ? primaryKind.tint : Color(hex: 0x30D158)))
+                    .frame(width: 6, height: 6)
+                Text(arg)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(isError ? Color(hex: 0xFF8E88) : palette.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                if isError {
+                    Text("error")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(Color(hex: 0xFF8E88))
+                } else if isRunning {
+                    Text("…")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(palette.muted)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+
+            if !isLast {
+                Rectangle().fill(palette.border.opacity(0.3)).frame(height: 0.5)
+                    .padding(.leading, 28)
+            }
+        }
+    }
+
+    // MARK: Pellet styling
+
+    private func pelletSymbol(_ kind: PelletKind) -> String {
+        switch kind {
+        case .code:    return "chevron.left.forwardslash.chevron.right"
+        case .fetch:   return "globe"
+        case .warning: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private func pelletLabel(_ kind: PelletKind, count: Int) -> String {
+        switch kind {
+        case .code:    return count == 1 ? "code step" : "code steps"
+        case .fetch:   return count == 1 ? "fetch" : "fetches"
+        case .warning: return count == 1 ? "warning" : "warnings"
+        }
+    }
+
+    private func pelletColor(_ kind: PelletKind) -> Color {
+        switch kind {
+        case .code:    return Color(hex: 0xBF5AF2)
+        case .fetch:   return Color(hex: 0x30D158)
+        case .warning: return Color(hex: 0xFF453A)
+        }
+    }
+
+    private func pelletBackground(_ kind: PelletKind, open: Bool) -> Color {
+        if kind == .warning { return Color(hex: 0xFF453A).opacity(open ? 0.16 : 0.08) }
+        return palette.text.opacity(open ? 0.08 : 0.04)
+    }
+
+    private func pelletBorder(_ kind: PelletKind, open: Bool) -> Color {
+        if kind == .warning { return Color(hex: 0xFF453A).opacity(0.35) }
+        return open ? palette.borderStrong : palette.border
+    }
+
+    // MARK: Card chrome
+
+    private var cardBackground: Color {
+        anyRunning
+            ? Color(hex: 0x0A84FF).opacity(0.04)
+            : palette.text.opacity(0.025)
+    }
+
+    private var borderColor: Color {
+        anyRunning ? Color(hex: 0x0A84FF).opacity(0.30) : palette.border
+    }
+
+    // MARK: Helpers
+
+    private func fetchURL(from argsJSON: String) -> String? {
+        guard let data = argsJSON.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return (dict["url"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    private func fetchTitle(from content: String) -> String? {
+        guard let data = content.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        if let inner = dict["content"] as? [String: Any],
+           let t = inner["title"] as? String, !t.isEmpty { return t }
+        if let t = dict["title"] as? String, !t.isEmpty { return t }
+        return nil
     }
 }
+

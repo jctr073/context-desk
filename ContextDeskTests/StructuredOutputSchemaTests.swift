@@ -63,6 +63,36 @@ final class StructuredOutputSchemaTests: XCTestCase {
         XCTAssertEqual(Set(types), Set(["string", "null"]))
     }
 
+    func testParagraphCitationsAreNullableArrayOfTypedRefs() throws {
+        let schema = StructuredOutputSchema.schema
+        let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+        let blocks = try XCTUnwrap(properties["blocks"] as? [String: Any])
+        let items = try XCTUnwrap(blocks["items"] as? [String: Any])
+        let anyOf = try XCTUnwrap(items["anyOf"] as? [[String: Any]])
+
+        let paragraphBranch = try XCTUnwrap(anyOf.first { branch in
+            let props = branch["properties"] as? [String: Any]
+            let kind = props?["kind"] as? [String: Any]
+            return (kind?["const"] as? String) == "paragraph"
+        })
+        let paragraphProps = try XCTUnwrap(paragraphBranch["properties"] as? [String: Any])
+        let citations = try XCTUnwrap(paragraphProps["citations"] as? [String: Any])
+        let citationsTypes = try XCTUnwrap(citations["type"] as? [String])
+        XCTAssertEqual(Set(citationsTypes), Set(["array", "null"]),
+                       "citations must be nullable so OpenAI strict mode accepts it as required")
+
+        let citationItems = try XCTUnwrap(citations["items"] as? [String: Any])
+        XCTAssertEqual(citationItems["type"] as? String, "object")
+        XCTAssertEqual(citationItems["additionalProperties"] as? Bool, false)
+        let itemRequired = try XCTUnwrap(citationItems["required"] as? [String])
+        XCTAssertEqual(Set(itemRequired), Set(["tool_call_id", "hit_index"]))
+        let itemProps = try XCTUnwrap(citationItems["properties"] as? [String: Any])
+        let toolCallID = try XCTUnwrap(itemProps["tool_call_id"] as? [String: Any])
+        XCTAssertEqual(toolCallID["type"] as? String, "string")
+        let hitIndex = try XCTUnwrap(itemProps["hit_index"] as? [String: Any])
+        XCTAssertEqual(hitIndex["type"] as? String, "integer")
+    }
+
     func testSchemaDataIsValidSortedJSON() throws {
         let data = StructuredOutputSchema.schemaData
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -52,12 +52,17 @@ struct CitationSource: Hashable {
 struct CitationRegistry {
     let byIndex: [String: CitationSource]
     let flat: [CitationSource]
+    /// Sources grouped by their tool call's id, so structured citations
+    /// emitted via the `citations: [{tool_call_id, hit_index}]` schema can
+    /// be resolved without going through the X-Y string format.
+    let byToolCallID: [String: [CitationSource]]
 
-    static let empty = CitationRegistry(byIndex: [:], flat: [])
+    static let empty = CitationRegistry(byIndex: [:], flat: [], byToolCallID: [:])
 
     static func build(from blocks: [OutputBlock]) -> CitationRegistry {
         var byIndex: [String: CitationSource] = [:]
         var flat: [CitationSource] = []
+        var byToolCallID: [String: [CitationSource]] = [:]
         var toolCounter = 0
 
         for unit in ToolUnitWalker.walk(blocks) {
@@ -87,9 +92,12 @@ struct CitationRegistry {
                 byIndex["\(toolCounter)-\(i + 1)"] = source
                 flat.append(source)
             }
+            if !sources.isEmpty {
+                byToolCallID[t.call.id] = sources
+            }
         }
 
-        return CitationRegistry(byIndex: byIndex, flat: flat)
+        return CitationRegistry(byIndex: byIndex, flat: flat, byToolCallID: byToolCallID)
     }
 
     /// URLs that appear behind `<cite index="…">` tags in the prose of
@@ -98,9 +106,19 @@ struct CitationRegistry {
     func citedURLs(in blocks: [OutputBlock]) -> Set<String> {
         var out: Set<String> = []
         for block in blocks {
+            // Structured citations win when present — they're the source
+            // of truth from the model.
+            if case .paragraph(_, let citations?) = block, !citations.isEmpty {
+                for c in citations {
+                    if let src = lookup(toolCallID: c.toolCallID, hitIndex: c.hitIndex) {
+                        out.insert(src.url)
+                    }
+                }
+                continue
+            }
             let text: String
             switch block {
-            case .paragraph(let t): text = t
+            case .paragraph(let t, _): text = t
             case .heading(let t):   text = t
             case .bulletList(let items): text = items.joined(separator: "\n")
             case .table(_, let rows): text = rows.flatMap { $0 }.joined(separator: "\n")
@@ -128,6 +146,15 @@ struct CitationRegistry {
             if y > 0 && y <= flat.count { return flat[y - 1] }
         }
         return nil
+    }
+
+    /// Resolve a structured `Citation` ref to its source. Returns nil when
+    /// the tool call isn't present in this registry (stale id, dropped
+    /// after regenerate) or when `hitIndex` is out of range.
+    func lookup(toolCallID: String, hitIndex: Int) -> CitationSource? {
+        guard let sources = byToolCallID[toolCallID],
+              hitIndex > 0, hitIndex <= sources.count else { return nil }
+        return sources[hitIndex - 1]
     }
 
     private static func parseFetchSource(args: String, content: String) -> CitationSource? {
@@ -309,8 +336,24 @@ enum ProseTextBuilder {
         _ raw: String,
         registry: CitationRegistry,
         palette: Palette,
-        slack: Bool = false
+        slack: Bool = false,
+        structuredCitations: [Citation]? = nil
     ) -> Text {
+        // Prefer structured citations from the schema when present. They're
+        // unambiguous (tool_call_id + hit_index) so we don't need to parse
+        // text patterns out of the prose at all. Fall back to `<cite>` tag
+        // parsing when no structured citations were attached — the schema
+        // is optional during the migration.
+        if let citations = structuredCitations, !citations.isEmpty {
+            return renderWithStructuredCitations(
+                raw,
+                citations: citations,
+                registry: registry,
+                palette: palette,
+                slack: slack
+            )
+        }
+
         let segments = CitationParser.parse(raw)
         var out: Text = Text("")
         var hasContent = false
@@ -336,6 +379,30 @@ enum ProseTextBuilder {
             hasContent = true
         }
         return hasContent ? out : Text(raw)
+    }
+
+    /// Render prose followed by trailing pills, one per structured
+    /// citation. The schema doesn't carry inline anchor positions, so the
+    /// pills land at the end of the paragraph rather than mid-sentence.
+    /// Sources we can't resolve (stale `tool_call_id` after a regenerate)
+    /// are silently dropped.
+    private static func renderWithStructuredCitations(
+        _ raw: String,
+        citations: [Citation],
+        registry: CitationRegistry,
+        palette: Palette,
+        slack: Bool
+    ) -> Text {
+        var out: Text = markdownText(slack ? slackInlineAsMarkdown(raw) : raw)
+        var seenURLs: Set<String> = []
+        for citation in citations {
+            guard let source = registry.lookup(toolCallID: citation.toolCallID, hitIndex: citation.hitIndex),
+                  !seenURLs.contains(source.url),
+                  let img = pillImage(source: source, palette: palette) else { continue }
+            seenURLs.insert(source.url)
+            out = out + Text(" ") + Text(Image(nsImage: img)).baselineOffset(-1)
+        }
+        return out
     }
 
     private static func markdownText(_ s: String) -> Text {

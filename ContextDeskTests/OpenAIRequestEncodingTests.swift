@@ -145,6 +145,73 @@ final class OpenAIRequestEncodingTests: XCTestCase {
         XCTAssertTrue(instructions.contains("minimal public-safe query"))
     }
 
+    func testChatRequestEncodesPreviousResponseIDAndTrimsTranscript() throws {
+        // When chaining a Responses API call, the new request body carries
+        // only the latest user turn — the server already has everything
+        // earlier under the named response id.
+        let chat = ChatSubmitPrompt(
+            model: .gpt55Medium,
+            operation: ChatOp.ask,
+            customInstructions: "",
+            turns: [
+                ChatTurn(role: .user, text: "first"),
+                ChatTurn(role: .assistant, text: "ack"),
+                ChatTurn(role: .user, text: "second"),
+            ]
+        )
+        let payload = try encode(OpenAIChatRequest(prompt: chat, stream: true, previousResponseID: "resp_prev"))
+
+        XCTAssertEqual(payload["previous_response_id"] as? String, "resp_prev")
+        let input = try XCTUnwrap(payload["input"] as? [[String: Any]])
+        XCTAssertEqual(input.count, 1, "only the latest user turn travels with previous_response_id")
+        XCTAssertEqual(input[0]["role"] as? String, "user")
+        let parts = try XCTUnwrap(input[0]["content"] as? [[String: Any]])
+        XCTAssertEqual(parts.first?["text"] as? String, "second")
+    }
+
+    func testChatRequestOmitsPreviousResponseIDByDefault() throws {
+        let chat = ChatSubmitPrompt(
+            model: .gpt55Medium,
+            operation: ChatOp.ask,
+            customInstructions: "",
+            turns: [ChatTurn(role: .user, text: "first")]
+        )
+        let payload = try encode(OpenAIChatRequest(prompt: chat, stream: true))
+        XCTAssertNil(payload["previous_response_id"])
+    }
+
+    func testChatRequestFoldsContextTextIntoInstructionsAndImagesIntoPreambleUser() throws {
+        let chat = ChatSubmitPrompt(
+            model: .gpt55Medium,
+            operation: ChatOp.ask,
+            customInstructions: "",
+            turns: [
+                ChatTurn(role: .user, text: "first"),
+                ChatTurn(role: .assistant, text: "ack"),
+                ChatTurn(role: .user, text: "second"),
+            ],
+            context: "These are the project notes.",
+            contextImages: [stubImage()]
+        )
+        let payload = try encode(OpenAIChatRequest(prompt: chat, stream: true))
+
+        let instructions = try XCTUnwrap(payload["instructions"] as? String)
+        XCTAssertTrue(instructions.contains("These are the project notes."),
+                      "context text must be in instructions, not folded into a user input item")
+
+        let input = try XCTUnwrap(payload["input"] as? [[String: Any]])
+        XCTAssertEqual(input.count, 4)
+        // Preamble user item carries only the context image.
+        XCTAssertEqual(input[0]["role"] as? String, "user")
+        let preambleParts = try XCTUnwrap(input[0]["content"] as? [[String: Any]])
+        XCTAssertEqual(preambleParts.count, 1)
+        XCTAssertEqual(preambleParts[0]["type"] as? String, "input_image")
+        // The first real user turn's text is unchanged — no context preface.
+        let firstUserParts = try XCTUnwrap(input[1]["content"] as? [[String: Any]])
+        XCTAssertEqual(firstUserParts.first?["type"] as? String, "input_text")
+        XCTAssertEqual(firstUserParts.first?["text"] as? String, "first")
+    }
+
     // MARK: - Helpers
 
     private func encode<T: Encodable>(_ value: T) throws -> [String: Any] {

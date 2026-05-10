@@ -207,10 +207,10 @@ ContextDesk/
 ## Model routing
 
 The chat UI appends a user `ChatMessage`, creates an empty assistant placeholder,
-and calls `AIWritingService.submitChatStream(turns:operation:customInstructions:model:apiKey:)`.
-The active conversation's context text and images are folded into the first user
-turn for the request, so the model sees the reusable reference material without
-duplicating it into every saved message.
+and calls `AIWritingService.submitChatStream(turns:operation:customInstructions:context:contextImages:previousResponseID:model:webAccessEnabled:apiKey:onResponseID:)`.
+Conversation-wide context text is folded into the system prompt (so it stays in
+the cacheable prefix) and context images ride as a stable preamble user message,
+unchanged across turns; the saved transcript is never spliced.
 
 `AIWritingService` builds one provider-neutral `ChatSubmitPrompt`: transcript
 turns, operation instructions, conversation-wide custom instructions, attached
@@ -218,18 +218,36 @@ images, the per-conversation Web toggle, and the selected model. OpenAI receives
 `instructions` plus a multi-turn Responses API `input`, a forced `emit_output`
 function tool, `stream: true`, and `reasoning.effort` for GPT-5.5 effort
 variants. Anthropic receives the same system guidance through Messages API
-`system`, image/text content blocks, `stream: true`, and the same
-structured-output tool. Claude Opus 4.7 effort variants are sent as Anthropic
-`output_config.effort` with adaptive thinking enabled.
+`system` (typed text blocks with `cache_control: ephemeral`), image/text content
+blocks, `stream: true`, and the same structured-output tool. Claude Opus 4.7
+effort variants are sent as Anthropic `output_config.effort` with adaptive
+thinking enabled.
+
+Anthropic prompt caching is on by default: the system prompt, the trailing
+entry of the `tools` array (the `emit_output` schema dominates byte cost), and
+the most recent assistant message in chat mode are each marked as cache
+breakpoints. The `anthropic-beta: prompt-caching-2024-07-31` opt-in header is
+included as a safety net for older `anthropic-version` values. OpenAI chats
+chain via `previous_response_id`: after each assistant turn the captured
+`response.id` is persisted on `ChatMessage.providerResponseID`, and the next
+turn sends only the new user message instead of the full transcript. Editing
+context images invalidates the chain so the next send reverts to a full
+upload; regenerate also bypasses the chain.
 
 Hosted OpenAI `web_search` and Anthropic `web_search` / `web_fetch` tools are
 registered only when the conversation Web toggle is enabled. Tool telemetry
 rendered in the UI comes from provider tool events; the final-answer schema does
-not allow the model to invent tool cards.
+not allow the model to invent tool cards. Paragraph blocks may carry an
+optional `citations: [{tool_call_id, hit_index}]` array, which the citation
+renderer prefers over `<cite>` text patterns when present.
 
 Both live providers stream Server-Sent Events into `StreamingOutputParser`, which
 turns partial JSON-schema/tool-output deltas into `[OutputBlock]` snapshots for
-the thread and output canvas. Google/Gemini currently routes to mock output.
-Provider key lookup checks the provider's environment variable names in shell
-profiles and the inherited process environment. ContextDesk does not store or
-read keys from Mac Keychain.
+the thread and output canvas. Initial requests are wrapped by `RetryableHTTP`,
+which retries `429` and `5xx` responses up to twice with jittered backoff before
+surfacing the failure. Provider failures are classified into an `APIErrorKind`
+(auth, rateLimited, overloaded, server, other), and `auth` failures route the
+user back to the API-key setup sheet automatically. Google/Gemini currently
+routes to mock output. Provider key lookup checks the provider's environment
+variable names in shell profiles and the inherited process environment.
+ContextDesk does not store or read keys from Mac Keychain.

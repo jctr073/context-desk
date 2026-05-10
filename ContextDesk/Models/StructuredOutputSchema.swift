@@ -38,10 +38,26 @@ enum StructuredOutputSchema {
     private static let paragraphSchema: [String: Any] = [
         "type": "object",
         "additionalProperties": false,
-        "required": ["kind", "text"],
+        // `citations` is in `required` so OpenAI strict mode accepts the
+        // object — when there are no citations the model emits `null`,
+        // matching the array-or-null type below. Same pattern as the
+        // codeBlock `language` field.
+        "required": ["kind", "text", "citations"],
         "properties": [
             "kind": ["const": "paragraph", "type": "string"],
             "text": ["type": "string"],
+            "citations": [
+                "type": ["array", "null"],
+                "items": [
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["tool_call_id", "hit_index"],
+                    "properties": [
+                        "tool_call_id": ["type": "string"],
+                        "hit_index": ["type": "integer"],
+                    ],
+                ],
+            ],
         ],
     ]
 

@@ -12,7 +12,7 @@ extension OutputBlock {
 
     var markdown: String {
         switch self {
-        case .paragraph(let text):
+        case .paragraph(let text, _):
             return text
         case .heading(let text):
             return "## \(text)"
@@ -39,7 +39,7 @@ extension OutputBlock {
 
     private var slack: String {
         switch self {
-        case .paragraph(let text):
+        case .paragraph(let text, _):
             return text
         case .heading(let text):
             return "*\(text)*"

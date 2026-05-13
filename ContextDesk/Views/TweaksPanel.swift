@@ -55,6 +55,9 @@ struct TweaksPanel: View {
             section(label: "Theme") {
                 segmentedTheme
             }
+            section(label: "Default Mode") {
+                segmentedDefaultMode
+            }
         }
         .padding(12)
     }
@@ -75,6 +78,16 @@ struct TweaksPanel: View {
             ForEach(AppTheme.allCases) { t in
                 segChip(label: t.label, isActive: state.theme == t) {
                     state.theme = t
+                }
+            }
+        }
+    }
+
+    private var segmentedDefaultMode: some View {
+        HStack(spacing: 6) {
+            ForEach(WritingMode.allCases) { m in
+                segChip(label: m.label, isActive: state.defaultMode == m) {
+                    state.defaultMode = m
                 }
             }
         }

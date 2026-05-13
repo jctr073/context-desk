@@ -25,6 +25,8 @@ final class AppState: ObservableObject {
     @Published var mode: WritingMode = .chat {
         didSet { syncActiveConversationMeta() }
     }
+    /// Mode applied to brand-new conversations and the toolbar at launch.
+    @Published var defaultMode: WritingMode = .chat
     @Published var ops: Set<WritingOp> = [.cleanup] {
         didSet { syncActiveConversationMeta() }
     }
@@ -78,6 +80,8 @@ final class AppState: ObservableObject {
         self.conversations = ConversationStore.load()
         if let first = self.conversations.first {
             adoptConversation(first.id)
+        } else {
+            self.mode = defaultMode
         }
     }
 
@@ -245,9 +249,11 @@ final class AppState: ObservableObject {
     func newConversation() {
         runTask?.cancel()
         running = false
+        mode = defaultMode
         let convo = Conversation(
+            mode: defaultMode,
             modelID: model.id,
-            operationID: activeOperation.id,
+            operationID: OperationCatalog.defaultOp(for: defaultMode).id,
             containerFormat: containerFormat
         )
         conversations.insert(convo, at: 0)

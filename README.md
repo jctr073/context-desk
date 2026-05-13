@@ -40,7 +40,8 @@ deterministic mock output for now.
 - Conversation sidebar with persisted threads, per-thread mode/operation,
   context, images, and outputs. The sidebar "+" starts a new conversation
   (⌘N), and saved conversations are capped to the most recent 50.
-- Light and dark themes via the floating Tweaks panel.
+- Floating Tweaks panel for light/dark theme and the default mode (Chat or
+  Writing) applied to new conversations and the toolbar at launch.
 - Output canvas with Rendered / Raw modes, reply tabs, copy, regenerate, and
   writing-mode diff view that highlights additions / deletions vs. the original
   input.

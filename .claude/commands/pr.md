@@ -30,8 +30,8 @@ The Xcode project tracks two values in `WritingBuddy.xcodeproj/project.pbxproj`,
 
 Read the current values (`grep -nE '(MARKETING_VERSION|CURRENT_PROJECT_VERSION)' WritingBuddy.xcodeproj/project.pbxproj`), then decide the bump from the diff:
 
-- **Patch** (default): bug fixes, refactors, internal-only work, tests, docs, build/tooling tweaks, dependency bumps without behavior change.
-- **Minor**: a new user-visible feature, a new screen/module, a new provider integration, or any meaningful capability addition.
+- **Patch** (default — use this for the vast majority of changes): bug fixes, refactors, internal-only work, tests, docs, build/tooling tweaks, dependency bumps, *and* minor UI tweaks or small user-visible adjustments (copy changes, layout fixes, small additions to existing screens, polish, small behavior changes to existing features).
+- **Minor**: only for *significant* user-visible additions or backend changes — a brand-new screen/module, a new provider integration, a major new feature, or a substantial backend/architecture change. If you're unsure whether something is "significant" enough, prefer Patch.
 - **Major**: a breaking change, removal of a major feature, fundamental UX overhaul, or anything the user should explicitly opt into. **Always pause and confirm with the user before bumping major.** Show your reasoning and the proposed new version.
 
 Always increment `CURRENT_PROJECT_VERSION` by 1, regardless of which semver part bumps.

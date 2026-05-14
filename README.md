@@ -35,8 +35,9 @@ deterministic mock output for now.
 - Attached images are previewed inline, can be opened in a lightbox, and are
   included in live OpenAI / Anthropic requests.
 - System-wide Control-A import: copies selected text from the frontmost app
-  into the composer while ContextDesk is running. macOS Accessibility
-  permission is required the first time this is used.
+  into a new conversation's composer (using the default mode set in Tweaks)
+  while ContextDesk is running. macOS Accessibility permission is required
+  the first time this is used.
 - Conversation sidebar with persisted threads, per-thread mode/operation,
   context, images, and outputs. The sidebar "+" starts a new conversation
   (⌘N), and saved conversations are capped to the most recent 50.

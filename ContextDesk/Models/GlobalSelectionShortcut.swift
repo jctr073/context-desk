@@ -7,41 +7,49 @@ final class GlobalSelectionShortcut {
     static let shared = GlobalSelectionShortcut()
 
     private static let signature = OSType(0x5742484B) // WBHK
+    private static let hotKeyID: UInt32 = 1
 
-    private enum HotKey: UInt32, CaseIterable {
-        /// Single hotkey for the chat redesign: pull selected text from the
-        /// frontmost app and drop it into the composer.
-        case importIntoComposer = 1
-
-        var keyCode: UInt32 {
-            switch self {
-            case .importIntoComposer: return UInt32(kVK_ANSI_A)
-            }
-        }
-
-        var label: String {
-            switch self {
-            case .importIntoComposer: return "Control-A"
-            }
-        }
-    }
-
-    private var hotKeyRefs: [EventHotKeyRef] = []
+    private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
     private var action: (() -> Void)?
+    private var currentShortcut: KeyboardShortcut?
 
     private init() {}
 
-    func start(action: @escaping () -> Void) {
+    /// Install the global handler and register `shortcut`. Subsequent calls
+    /// just update the action — use `update(to:)` to change the binding.
+    func start(shortcut: KeyboardShortcut, action: @escaping () -> Void) {
         self.action = action
-        guard hotKeyRefs.isEmpty else { return }
+        if eventHandlerRef == nil {
+            installHandler()
+        }
+        register(shortcut: shortcut)
+    }
 
+    /// Swap the active hotkey at runtime — used when the user re-binds it
+    /// from the Tweaks panel.
+    func update(to shortcut: KeyboardShortcut) {
+        guard shortcut != currentShortcut else { return }
+        register(shortcut: shortcut)
+    }
+
+    func stop() {
+        unregisterHotKey()
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+            self.eventHandlerRef = nil
+        }
+    }
+
+    // MARK: - Internals
+
+    private func installHandler() {
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
         )
 
-        let handlerStatus = InstallEventHandler(
+        let status = InstallEventHandler(
             GetApplicationEventTarget(),
             { _, eventRef, userData in
                 guard let eventRef, let userData else { return noErr }
@@ -59,7 +67,7 @@ final class GlobalSelectionShortcut {
 
                 guard parameterStatus == noErr,
                       hotKeyID.signature == GlobalSelectionShortcut.signature,
-                      let hotKey = HotKey(rawValue: hotKeyID.id)
+                      hotKeyID.id == GlobalSelectionShortcut.hotKeyID
                 else {
                     return noErr
                 }
@@ -68,7 +76,6 @@ final class GlobalSelectionShortcut {
                     .fromOpaque(userData)
                     .takeUnretainedValue()
 
-                _ = hotKey
                 Task { @MainActor in
                     shortcut.action?()
                 }
@@ -81,47 +88,41 @@ final class GlobalSelectionShortcut {
             &eventHandlerRef
         )
 
-        guard handlerStatus == noErr else {
-            print("Global shortcut handler registration failed:", handlerStatus)
+        guard status == noErr else {
+            print("Global shortcut handler registration failed:", status)
             return
-        }
-
-        for hotKey in HotKey.allCases {
-            var hotKeyRef: EventHotKeyRef?
-            let hotKeyID = EventHotKeyID(
-                signature: Self.signature,
-                id: hotKey.rawValue
-            )
-
-            let hotKeyStatus = RegisterEventHotKey(
-                hotKey.keyCode,
-                UInt32(controlKey),
-                hotKeyID,
-                GetApplicationEventTarget(),
-                0,
-                &hotKeyRef
-            )
-
-            guard hotKeyStatus == noErr, let hotKeyRef else {
-                print("Global \(hotKey.label) shortcut registration failed:", hotKeyStatus)
-                stop()
-                return
-            }
-
-            hotKeyRefs.append(hotKeyRef)
         }
     }
 
-    func stop() {
-        for hotKeyRef in hotKeyRefs {
-            UnregisterEventHotKey(hotKeyRef)
-        }
-        hotKeyRefs.removeAll()
+    private func register(shortcut: KeyboardShortcut) {
+        unregisterHotKey()
 
-        if let eventHandlerRef {
-            RemoveEventHandler(eventHandlerRef)
-            self.eventHandlerRef = nil
+        var newRef: EventHotKeyRef?
+        let id = EventHotKeyID(signature: Self.signature, id: Self.hotKeyID)
+        let status = RegisterEventHotKey(
+            shortcut.keyCode,
+            shortcut.modifiers,
+            id,
+            GetApplicationEventTarget(),
+            0,
+            &newRef
+        )
+
+        guard status == noErr, let newRef else {
+            print("Global \(shortcut.symbolDescription) shortcut registration failed:", status)
+            return
         }
+
+        hotKeyRef = newRef
+        currentShortcut = shortcut
+    }
+
+    private func unregisterHotKey() {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
+        }
+        currentShortcut = nil
     }
 }
 

@@ -71,6 +71,10 @@
 		WBBLD000000000000000078 /* CitationPillsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000078 /* CitationPillsTests.swift */; };
 		WBBLD000000000000000079 /* CodeSessionRollTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000079 /* CodeSessionRollTests.swift */; };
 		WBBLD000000000000000080 /* APIErrorKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000080 /* APIErrorKindTests.swift */; };
+		WBBLD000000000000000081 /* AppPreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000081 /* AppPreferencesStore.swift */; };
+		WBBLD000000000000000082 /* AppPreferencesStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000082 /* AppPreferencesStoreTests.swift */; };
+		WBBLD000000000000000083 /* KeyboardShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000083 /* KeyboardShortcut.swift */; };
+		WBBLD000000000000000084 /* KeyboardShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000084 /* KeyboardShortcutTests.swift */; };
 		WBBLD000000000000000076 /* ToolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000076 /* ToolCardView.swift */; };
 		WBBLD000000000000000077 /* CitationPills.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000077 /* CitationPills.swift */; };
 		WBBLD000000000000000067 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000067 /* Conversation.swift */; };
@@ -142,6 +146,10 @@
 		WBFILE00000000000000078 /* CitationPillsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationPillsTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000079 /* CodeSessionRollTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeSessionRollTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000080 /* APIErrorKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIErrorKindTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000081 /* AppPreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferencesStore.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000082 /* AppPreferencesStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferencesStoreTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000083 /* KeyboardShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcut.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000084 /* KeyboardShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000076 /* ToolCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCardView.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000077 /* CitationPills.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CitationPills.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000067 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
@@ -199,6 +207,8 @@
 				WBFILE00000000000000078 /* CitationPillsTests.swift */,
 				WBFILE00000000000000079 /* CodeSessionRollTests.swift */,
 				WBFILE00000000000000080 /* APIErrorKindTests.swift */,
+				WBFILE00000000000000082 /* AppPreferencesStoreTests.swift */,
+				WBFILE00000000000000084 /* KeyboardShortcutTests.swift */,
 			);
 			path = ContextDeskTests;
 			sourceTree = "<group>";
@@ -248,10 +258,12 @@
 				WBFILE00000000000000009 /* AIModel.swift */,
 				WBFILE00000000000000010 /* MockGenerator.swift */,
 				WBFILE00000000000000011 /* DiffEngine.swift */,
+				WBFILE00000000000000081 /* AppPreferencesStore.swift */,
 				WBFILE00000000000000029 /* APIKeyStore.swift */,
 				WBFILE00000000000000031 /* OpenAIService.swift */,
 				WBFILE00000000000000032 /* RenderMode.swift */,
 				WBFILE00000000000000035 /* GlobalSelectionShortcut.swift */,
+				WBFILE00000000000000083 /* KeyboardShortcut.swift */,
 				WBFILE00000000000000037 /* AttachedImage.swift */,
 				WBFILE00000000000000060 /* SSEEventStream.swift */,
 				WBFILE00000000000000061 /* StreamingOutputParser.swift */,
@@ -425,6 +437,7 @@
 				WBBLD000000000000000010 /* MockGenerator.swift in Sources */,
 				WBBLD000000000000000031 /* OpenAIService.swift in Sources */,
 				WBBLD000000000000000011 /* DiffEngine.swift in Sources */,
+				WBBLD000000000000000081 /* AppPreferencesStore.swift in Sources */,
 				WBBLD000000000000000012 /* ContentView.swift in Sources */,
 				WBBLD000000000000000013 /* Titlebar.swift in Sources */,
 				WBBLD000000000000000014 /* ModelPicker.swift in Sources */,
@@ -448,6 +461,7 @@
 				WBBLD000000000000000033 /* OutputBlock+Markdown.swift in Sources */,
 				WBBLD000000000000000034 /* SegmentedToggle.swift in Sources */,
 				WBBLD000000000000000035 /* GlobalSelectionShortcut.swift in Sources */,
+				WBBLD000000000000000083 /* KeyboardShortcut.swift in Sources */,
 				WBBLD000000000000000036 /* CustomInstructionsSheet.swift in Sources */,
 				WBBLD000000000000000068 /* ContextSheet.swift in Sources */,
 				WBBLD000000000000000037 /* AttachedImage.swift in Sources */,
@@ -486,6 +500,8 @@
 				WBBLD000000000000000078 /* CitationPillsTests.swift in Sources */,
 				WBBLD000000000000000079 /* CodeSessionRollTests.swift in Sources */,
 				WBBLD000000000000000080 /* APIErrorKindTests.swift in Sources */,
+				WBBLD000000000000000082 /* AppPreferencesStoreTests.swift in Sources */,
+				WBBLD000000000000000084 /* KeyboardShortcutTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -611,7 +627,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -624,7 +640,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.2;
+				MARKETING_VERSION = 1.6.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -639,7 +655,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -652,7 +668,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.2;
+				MARKETING_VERSION = 1.6.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -665,10 +681,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.6.2;
+				MARKETING_VERSION = 1.6.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -683,10 +699,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.6.2;
+				MARKETING_VERSION = 1.6.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.contextdesk.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

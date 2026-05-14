@@ -34,15 +34,16 @@ deterministic mock output for now.
 - Input and context image attachments via picker, paste, or drag and drop.
 - Attached images are previewed inline, can be opened in a lightbox, and are
   included in live OpenAI / Anthropic requests.
-- System-wide Control-A import: copies selected text from the frontmost app
-  into a new conversation's composer (using the default mode set in Tweaks)
-  while ContextDesk is running. macOS Accessibility permission is required
-  the first time this is used.
+- System-wide selection import (default ⌃A, rebindable in Tweaks): copies
+  selected text from the frontmost app into a new conversation's composer
+  (using the default mode set in Tweaks) while ContextDesk is running. macOS
+  Accessibility permission is required the first time this is used.
 - Conversation sidebar with persisted threads, per-thread mode/operation,
   context, images, and outputs. The sidebar "+" starts a new conversation
   (⌘N), and saved conversations are capped to the most recent 50.
-- Floating Tweaks panel for light/dark theme and the default mode (Chat or
-  Writing) applied to new conversations and the toolbar at launch.
+- Floating Tweaks panel for light/dark theme, the default mode (Chat or
+  Writing) applied to new conversations and the toolbar at launch, and the
+  click-to-record binding for the global selection import shortcut.
 - Output canvas with Rendered / Raw modes, reply tabs, copy, regenerate, and
   writing-mode diff view that highlights additions / deletions vs. the original
   input.

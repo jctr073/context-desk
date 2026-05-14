@@ -31,7 +31,7 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 580)
         .background(WindowAccessor(movableByBackground: !overlayActive))
         .onAppear {
-            GlobalSelectionShortcut.shared.start {
+            GlobalSelectionShortcut.shared.start(shortcut: state.importSelectionShortcut) {
                 state.importSelectedTextFromActiveApp()
             }
         }

@@ -26,7 +26,12 @@ final class AppState: ObservableObject {
         didSet { syncActiveConversationMeta() }
     }
     /// Mode applied to brand-new conversations and the toolbar at launch.
-    @Published var defaultMode: WritingMode = .chat
+    @Published var defaultMode: WritingMode = .chat {
+        didSet {
+            guard defaultMode != oldValue else { return }
+            AppPreferencesStore.saveDefaultMode(defaultMode)
+        }
+    }
     @Published var ops: Set<WritingOp> = [.cleanup] {
         didSet { syncActiveConversationMeta() }
     }
@@ -64,7 +69,19 @@ final class AppState: ObservableObject {
 
     // MARK: Global app chrome
     @Published var model: AIModel = .gpt55Medium
-    @Published var theme: AppTheme = .dark
+    @Published var theme: AppTheme = .dark {
+        didSet {
+            guard theme != oldValue else { return }
+            AppPreferencesStore.saveTheme(theme)
+        }
+    }
+    @Published var importSelectionShortcut: KeyboardShortcut = .defaultImportSelection {
+        didSet {
+            guard importSelectionShortcut != oldValue else { return }
+            AppPreferencesStore.saveImportSelectionShortcut(importSelectionShortcut)
+            GlobalSelectionShortcut.shared.update(to: importSelectionShortcut)
+        }
+    }
     @Published var historyVisible: Bool = true
     @Published var canvasVisible: Bool = true
     @Published var canvasSplit: Double = 0.66
@@ -76,6 +93,10 @@ final class AppState: ObservableObject {
     private var suppressMetaSync = false
 
     init() {
+        let preferences = AppPreferencesStore.load()
+        self.defaultMode = preferences.defaultMode
+        self.theme = preferences.theme
+        self.importSelectionShortcut = preferences.importSelectionShortcut
         self.configuredProviders = Self.configuredProviderSet()
         self.conversations = ConversationStore.load()
         if let first = self.conversations.first {

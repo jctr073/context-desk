@@ -555,6 +555,7 @@ final class AppState: ObservableObject {
                 NSApp.activate(ignoringOtherApps: true)
                 switch result {
                 case .success(let text):
+                    self.newConversation()
                     self.draft = text
                 case .accessibilityPermissionNeeded:
                     self.draft = "(Enable Accessibility permission in System Settings to import selected text.)"

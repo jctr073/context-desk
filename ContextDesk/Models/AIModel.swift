@@ -1,6 +1,6 @@
 import Foundation
 
-enum AIProvider: String, CaseIterable, Identifiable, Hashable {
+enum AIProvider: String, CaseIterable, Identifiable, Hashable, Codable {
     case anthropic, openai, google
 
     var id: String { rawValue }
@@ -72,6 +72,17 @@ enum ReasoningEffort: String, Codable, Hashable {
     case high
     case xhigh
     case max
+
+    /// Label shown in the model picker's effort chip and in resolved model names.
+    var displayLabel: String {
+        switch self {
+        case .low:    return "Low"
+        case .medium: return "Medium"
+        case .high:   return "High"
+        case .xhigh:  return "xhigh"
+        case .max:    return "Max"
+        }
+    }
 }
 
 struct AIModel: Identifiable, Hashable {
@@ -120,18 +131,12 @@ struct AIModel: Identifiable, Hashable {
         all.filter { $0.provider == provider }
     }
 
+    /// Baseline-only resolution of a persisted/legacy id (no live catalog).
+    /// The live, auto-versioned path is `ModelCatalog.model(withID:)`; both
+    /// share `ModelFamily.resolve(id:)` so back-compat behaves identically.
     static func model(withID id: String) -> AIModel? {
-        if ["gpt-5.5", "gpt-4.1", "gpt-4.1-mini"].contains(id) {
-            return .gpt55Medium
-        }
-        if ["claude-opus-4", "claude-opus-4.7", "claude-opus-4-7"].contains(id) {
-            return .claudeOpus47High
-        }
-        if ["claude-sonnet-4.5", "claude-sonnet-4-5", "claude-sonnet-4-5-20250929", "claude-sonnet-4-6"].contains(id) {
-            return .claudeSonnet46
-        }
-        if ["claude-haiku-4.5", "claude-haiku-4-5", "claude-haiku-4-5-20251001"].contains(id) {
-            return .claudeHaiku45
+        if let (family, effort) = ModelFamily.resolve(id: id) {
+            return family.aiModel(effort: effort, resolved: nil)
         }
         return all.first { $0.id == id }
     }

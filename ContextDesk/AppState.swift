@@ -68,7 +68,17 @@ final class AppState: ObservableObject {
     @Published var streamingMessageIndex: Int? = nil
 
     // MARK: Global app chrome
-    @Published var model: AIModel = .gpt55Medium
+    /// Dynamic, auto-versioned model catalog backing the picker.
+    let catalog = ModelCatalog()
+    @Published var model: AIModel = .gpt55Medium {
+        didSet {
+            guard model != oldValue else { return }
+            syncActiveConversationMeta()
+        }
+    }
+    /// Last reasoning effort the user picked per family, so switching back to a
+    /// family restores its effort instead of resetting to the default.
+    private var effortByFamily: [String: ReasoningEffort] = [:]
     @Published var theme: AppTheme = .dark {
         didSet {
             guard theme != oldValue else { return }
@@ -98,12 +108,15 @@ final class AppState: ObservableObject {
         self.theme = preferences.theme
         self.importSelectionShortcut = preferences.importSelectionShortcut
         self.configuredProviders = Self.configuredProviderSet()
+        self.model = catalog.model(withID: "gpt-5#medium") ?? .gpt55Medium
+        catalog.onCatalogUpdated = { [weak self] in self?.reresolveSelectedModel() }
         self.conversations = ConversationStore.load()
         if let first = self.conversations.first {
             adoptConversation(first.id)
         } else {
             self.mode = defaultMode
         }
+        catalog.bootstrap()
     }
 
     // MARK: - Active conversation accessors
@@ -163,6 +176,42 @@ final class AppState: ObservableObject {
 
     private static func configuredProviderSet() -> Set<AIProvider> {
         Set(AIProvider.allCases.filter { APIKeyStore.exists(for: $0) })
+    }
+
+    // MARK: - Model selection
+
+    /// The family of the currently-selected model, if it maps to one.
+    var selectedFamily: ModelFamily? { catalog.family(for: model) }
+
+    /// Effort to display in a family's picker chip: the live selection when
+    /// that family is selected, else the remembered/default effort.
+    func effort(for family: ModelFamily) -> ReasoningEffort? {
+        guard family.isReasoning else { return nil }
+        if selectedFamily?.id == family.id {
+            return model.reasoningEffort ?? family.defaultEffort
+        }
+        return effortByFamily[family.id] ?? family.defaultEffort
+    }
+
+    /// Select a family's base model at its remembered/default effort.
+    func selectFamily(_ family: ModelFamily) {
+        let effort = family.isReasoning ? (effortByFamily[family.id] ?? family.defaultEffort) : nil
+        model = catalog.aiModel(family: family, effort: effort)
+    }
+
+    /// Change the reasoning effort for a family and select it.
+    func selectEffort(_ effort: ReasoningEffort, for family: ModelFamily) {
+        effortByFamily[family.id] = effort
+        model = catalog.aiModel(family: family, effort: effort)
+    }
+
+    /// Re-resolve the selected model against fresh discovery so the toolbar
+    /// flips to the latest version (e.g. Opus 4.7 → 4.8) without changing the
+    /// persisted family/effort selection.
+    private func reresolveSelectedModel() {
+        if let m = catalog.model(withID: model.id), m != model {
+            model = m
+        }
     }
 
     // MARK: - Composer state
@@ -308,7 +357,7 @@ final class AppState: ObservableObject {
         contextImages = convo.contextImages
         webAccessEnabled = convo.webAccessEnabled
         lastAddedContextImageID = nil
-        if let m = AIModel.model(withID: convo.modelID) { model = m }
+        if let m = catalog.model(withID: convo.modelID) { model = m }
         draft = ""
         draftImages = []
         lastAddedImageID = nil

@@ -73,6 +73,12 @@
 		WBBLD000000000000000080 /* APIErrorKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000080 /* APIErrorKindTests.swift */; };
 		WBBLD000000000000000081 /* AppPreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000081 /* AppPreferencesStore.swift */; };
 		WBBLD000000000000000082 /* AppPreferencesStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000082 /* AppPreferencesStoreTests.swift */; };
+		WBBLD000000000000000085 /* ModelFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000085 /* ModelFamily.swift */; };
+		WBBLD000000000000000086 /* ModelListingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000086 /* ModelListingService.swift */; };
+		WBBLD000000000000000087 /* ModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000087 /* ModelCatalog.swift */; };
+		WBBLD000000000000000088 /* ModelCatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000088 /* ModelCatalogStore.swift */; };
+		WBBLD000000000000000089 /* ModelFamilyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000089 /* ModelFamilyTests.swift */; };
+		WBBLD000000000000000090 /* ModelCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000090 /* ModelCatalogTests.swift */; };
 		WBBLD000000000000000083 /* KeyboardShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000083 /* KeyboardShortcut.swift */; };
 		WBBLD000000000000000084 /* KeyboardShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000084 /* KeyboardShortcutTests.swift */; };
 		WBBLD000000000000000076 /* ToolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WBFILE00000000000000076 /* ToolCardView.swift */; };
@@ -148,6 +154,12 @@
 		WBFILE00000000000000080 /* APIErrorKindTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIErrorKindTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000081 /* AppPreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferencesStore.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000082 /* AppPreferencesStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferencesStoreTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000085 /* ModelFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelFamily.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000086 /* ModelListingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelListingService.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000087 /* ModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalog.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000088 /* ModelCatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogStore.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000089 /* ModelFamilyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelFamilyTests.swift; sourceTree = "<group>"; };
+		WBFILE00000000000000090 /* ModelCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000083 /* KeyboardShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcut.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000084 /* KeyboardShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutTests.swift; sourceTree = "<group>"; };
 		WBFILE00000000000000076 /* ToolCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCardView.swift; sourceTree = "<group>"; };
@@ -209,6 +221,8 @@
 				WBFILE00000000000000080 /* APIErrorKindTests.swift */,
 				WBFILE00000000000000082 /* AppPreferencesStoreTests.swift */,
 				WBFILE00000000000000084 /* KeyboardShortcutTests.swift */,
+				WBFILE00000000000000089 /* ModelFamilyTests.swift */,
+				WBFILE00000000000000090 /* ModelCatalogTests.swift */,
 			);
 			path = ContextDeskTests;
 			sourceTree = "<group>";
@@ -268,6 +282,10 @@
 				WBFILE00000000000000060 /* SSEEventStream.swift */,
 				WBFILE00000000000000061 /* StreamingOutputParser.swift */,
 				WBFILE00000000000000072 /* ToolCallReplay.swift */,
+				WBFILE00000000000000085 /* ModelFamily.swift */,
+				WBFILE00000000000000086 /* ModelListingService.swift */,
+				WBFILE00000000000000087 /* ModelCatalog.swift */,
+				WBFILE00000000000000088 /* ModelCatalogStore.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -475,6 +493,10 @@
 				WBBLD000000000000000060 /* SSEEventStream.swift in Sources */,
 				WBBLD000000000000000061 /* StreamingOutputParser.swift in Sources */,
 				WBBLD000000000000000072 /* ToolCallReplay.swift in Sources */,
+				WBBLD000000000000000085 /* ModelFamily.swift in Sources */,
+				WBBLD000000000000000086 /* ModelListingService.swift in Sources */,
+				WBBLD000000000000000087 /* ModelCatalog.swift in Sources */,
+				WBBLD000000000000000088 /* ModelCatalogStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -502,6 +524,8 @@
 				WBBLD000000000000000080 /* APIErrorKindTests.swift in Sources */,
 				WBBLD000000000000000082 /* AppPreferencesStoreTests.swift in Sources */,
 				WBBLD000000000000000084 /* KeyboardShortcutTests.swift in Sources */,
+				WBBLD000000000000000089 /* ModelFamilyTests.swift in Sources */,
+				WBBLD000000000000000090 /* ModelCatalogTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

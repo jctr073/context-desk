@@ -9,17 +9,22 @@ revising.
 Built in **SwiftUI** for macOS 13+. OpenAI models use the Responses API,
 Claude models use Anthropic's Messages API, live provider responses stream into
 structured output blocks, API keys are read from shell profiles or the
-inherited process environment, and the app defaults to GPT-5.5 Medium.
-Google/Gemini is present in the picker for future support and still uses
-deterministic mock output for now.
+inherited process environment, and the app defaults to GPT-5.5 Medium. The
+model list is discovered from each provider's models API at runtime, with a
+bundled baseline used when offline or unkeyed. Google/Gemini is present in the
+picker for future support and still uses deterministic mock output for now.
 
 ## Features
 
 - macOS-style window with a custom titlebar, traffic lights, and a model
   picker in the top-right.
-- Grouped model picker with GPT-5.5 effort levels, Claude Opus 4.7 effort
-  levels, Claude Sonnet 4.6, Claude Haiku 4.5, and a Gemini 2.5 Pro
-  placeholder.
+- Dynamic model picker grouped by provider: the available models are
+  discovered from each provider's `/models` API at runtime (cached to disk,
+  with an offline baseline fallback and a "Refresh models" action). Each model
+  is one row, with an inline reasoning-effort submenu for Claude Opus and GPT;
+  Claude Sonnet, Claude Haiku, and the Gemini 2.5 Pro placeholder appear as
+  single rows. Newly released models in a known family are picked up
+  automatically.
 - Three-pane workspace with a collapsible conversation sidebar, a multi-turn
   chat thread, and a resizable/hideable output canvas.
 - Chat mode operations for Ask / Plan / Summarize / Compare / Translate, plus
@@ -172,7 +177,11 @@ ContextDesk/
     RenderMode.swift        — Rendered vs Raw output toggle
     Conversation.swift      — persisted chat threads
     RecentItem.swift        — legacy persisted history items
-    AIModel.swift           — model list
+    AIModel.swift           — model + provider types and id resolution
+    ModelFamily.swift       — curated model families, version ranking, filtering
+    ModelListingService.swift — provider /models fetch + family resolution
+    ModelCatalog.swift      — live model catalog (fetch, cache, fallback)
+    ModelCatalogStore.swift — on-disk model catalog cache
     AttachedImage.swift     — image loading, metadata, and base64 payloads
     APIKeyStore.swift       — shell-profile and environment API-key lookup
     OpenAIService.swift     — provider-dispatched streaming clients
